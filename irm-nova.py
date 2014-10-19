@@ -189,12 +189,13 @@ def loadHostList():
 
 def getHostDetails(hostname):
     logger.info("Called")
+ 
     headers = {'X-Auth-Token': token_id}
     #headers = None       
     if str(token_id) not in str(headers):
     	raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
     	logger.error("Failed to assign headers. Possible fault in token_id")
-
+   
     r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
     #print r
     try:
@@ -203,7 +204,7 @@ def getHostDetails(hostname):
     	print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
     	print ""
     	logger.error("Error within public_url or hostname")
-    #print hostDetails    
+    print "Host Details: ", hostDetails    
     
     if hostDetails:
        return hostDetails
@@ -218,6 +219,8 @@ def createListAvailableResources(host_list,public_url,token_id,option):
      h_list = getHosts()
      
      # loop through all hosts
+     print "h_list=", h_list
+     print "host_list=", host_list
      for novah in h_list:
          for h in host_list['Machine']:
            if novah == h['host_name']:
@@ -529,6 +532,7 @@ def verifyResources():
                 	logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
                 IP = "100"
                 # change to private to vmnet in field below
+   
                 for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                     if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                         IP = private['addr']
@@ -641,7 +645,8 @@ def reserveResources():
                           # build body for nova api
                           # create instances up to the number in the request
                           #for i in xrange(0,count):
-                          data = json.dumps({"server" : {\
+                          
+                          dobj = {"server" : {\
                                       "name" : name,\
                                       "imageRef" : image, \
                                       #"imageRef" : "162bb278-76cf-4dd2-8560-e3367050d32a", \
@@ -650,14 +655,21 @@ def reserveResources():
                                       "flavorRef" : name,\
                                       "min_count": 1,\
                                       "max_count": 1,\
-                                      "availability_zone":host}})
+                                      "availability_zone":host}}
+                          if CONFIG.has_option('network', 'UUID'):
+                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
+                             
+                          print dobj
+                                                                                      
+                          data = json.dumps(dobj)
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
+                          print ">>>> ", public_url
                           r = requests.post(public_url+'/servers', data, headers=headers)
-                          #print r.json()
+                          print "===> r", r.json()
                           try:
                           	ID = r.json()['server']['id']
-                          except KeyError:
+                          except KeyError, msg:
                           	print "N-Irm: [reserveResources] Error within payload, please check spelling"
                           logger.error("KeyError in payload, please check spelling of attributes")
                           #print getInstanceInfo(ID)
@@ -707,23 +719,25 @@ def releaseResources(ID):
 @route('/method/releaseResources/', method='POST')
 @route('/method/releaseResources', method='POST')
 def releaseResources():
-    logger.info("Called")
+    logger.info("Called")  
     headers = {'X-Auth-Token': token_id}
     try:
     	req = json.load(request.body)
+    	
     except ValueError:
     	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
     	print " "
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        try:
+        try:          
     	    for ID in req['Reservations']:    	        
                 try:
     	    	    #forces it to break is incorrect ID
-    	    	    info = getInstanceInfo(ID)
-    	            osstatus = info['server']['status']
+                    info = getInstanceInfo(ID)
+                    osstatus = info['server']['status']
     	    	    #deletion of correct ID
                     r = requests.delete(public_url+'/servers/'+ID, headers=headers)
+                    return { "result": { } }
                 except TypeError:
                     print " "
                     raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
@@ -734,9 +748,6 @@ def releaseResources():
         except UnboundLocalError:
             raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
             logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
-
-            
-    #return r
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
@@ -938,9 +949,10 @@ def init(novaapi,tenantname,username,password,interface):
     global IP_ADDR
     IP_ADDR=getifip(interface)
     global CONFIG
-    CONFIG = ConfigParser.RawConfigParser()
-    CONFIG.read('irm.cfg') 
- 
+    if 'CONFIG' not in globals():
+       CONFIG = ConfigParser.RawConfigParser()
+       CONFIG.read('irm.cfg')
+         
 def default():
     INTERFACE = "eth0"
     print "No interface specified, using "+INTERFACE+" as default"
