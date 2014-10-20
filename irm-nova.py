@@ -5,35 +5,37 @@
 #
 #
 # Status
-# - all APIs are implemented and seem to be working, however there is no error management implemented yet
+# - all APIs are implemented and seem to be working
 # - loading additional info of computes not available through openstack from compute_list file
-#
-#
-#
-#
-#
-#
-#
-#
-# ToDO
-# - error management to intercept errors from OS and propagate to the CRS through the REST response
-# - daemon mode
 #
 #
 #
 # How it works
 # - check the help
-#    - ./irm-nova.py -h 
+#    - ./irm-nova.py -h
+#    - configuration files
+#       - general: irm.cfg
+#       - nova related: compute_list, this need to be filled with nova-compute(s) values
 # - start the API
 #    - e.g. ./irm-nova.py -a 192.168.56.108:5000 -t admin -u admin -w password -i eth0 -p 8888
-# 
-# - use any rest client (e.g. RESTClient for firefox) to make calls to the API
+#    - e.g. ./irm-nova.py -c irm.cfg
+#    - it can also be started through supervisor
+#         - supervisord -c ./supervisord.conf
+#
+# - test
+#    - unitTest
+#       - cd tests
+#       - ./test_irm-nova.py -i <irm-nova IP> -p <irm-nova PORT>
+#    - use any rest client (e.g. RESTClient for firefox) to make calls to the API
 #
 # - available APIs
-#   - /getAvailableResources
-#   - /checkReservation/<ID>
-#   - /reserveResources
-#   - /releaseResources/<ID>
+#   - /method/getAvailableResources
+#   - /method/getResourceTypes
+#   - /method/calculateResourceCapacity
+#   - /method/calculateResourceAgg
+#   - /method/verifyResources
+#   - /method/reserveResources
+#   - /method/releaseResources
 #
 #
 #
@@ -57,7 +59,7 @@ import logging.handlers as handlers
 #Config and format for logging messages
 logger = logging.getLogger("Rotating Log")
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S %p')
+formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
 ## Logging format
 handler.setFormatter(formatter)
@@ -189,13 +191,12 @@ def loadHostList():
 
 def getHostDetails(hostname):
     logger.info("Called")
- 
     headers = {'X-Auth-Token': token_id}
     #headers = None       
     if str(token_id) not in str(headers):
     	raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
     	logger.error("Failed to assign headers. Possible fault in token_id")
-   
+
     r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
     #print r
     try:
@@ -204,7 +205,7 @@ def getHostDetails(hostname):
     	print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
     	print ""
     	logger.error("Error within public_url or hostname")
-    print "Host Details: ", hostDetails    
+    #print hostDetails    
     
     if hostDetails:
        return hostDetails
@@ -219,8 +220,6 @@ def createListAvailableResources(host_list,public_url,token_id,option):
      h_list = getHosts()
      
      # loop through all hosts
-     print "h_list=", h_list
-     print "host_list=", host_list
      for novah in h_list:
          for h in host_list['Machine']:
            if novah == h['host_name']:
@@ -532,7 +531,6 @@ def verifyResources():
                 	logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
                 IP = "100"
                 # change to private to vmnet in field below
-   
                 for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                     if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                         IP = private['addr']
@@ -645,7 +643,6 @@ def reserveResources():
                           # build body for nova api
                           # create instances up to the number in the request
                           #for i in xrange(0,count):
-                          
                           dobj = {"server" : {\
                                       "name" : name,\
                                       "imageRef" : image, \
@@ -659,14 +656,13 @@ def reserveResources():
                           if CONFIG.has_option('network', 'UUID'):
                              dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
                              
-                          print dobj
+                          #print dobj
                                                                                       
                           data = json.dumps(dobj)
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
-                          print ">>>> ", public_url
                           r = requests.post(public_url+'/servers', data, headers=headers)
-                          print "===> r", r.json()
+                          #print r.json()
                           try:
                           	ID = r.json()['server']['id']
                           except KeyError, msg:
@@ -719,22 +715,21 @@ def releaseResources(ID):
 @route('/method/releaseResources/', method='POST')
 @route('/method/releaseResources', method='POST')
 def releaseResources():
-    logger.info("Called")  
+    logger.info("Called")
     headers = {'X-Auth-Token': token_id}
     try:
     	req = json.load(request.body)
-    	
     except ValueError:
     	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
     	print " "
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        try:          
+        try:
     	    for ID in req['Reservations']:    	        
                 try:
     	    	    #forces it to break is incorrect ID
-                    info = getInstanceInfo(ID)
-                    osstatus = info['server']['status']
+    	    	    info = getInstanceInfo(ID)
+    	            osstatus = info['server']['status']
     	    	    #deletion of correct ID
                     r = requests.delete(public_url+'/servers/'+ID, headers=headers)
                     return { "result": { } }
@@ -748,6 +743,9 @@ def releaseResources():
         except UnboundLocalError:
             raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
             logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
+
+            
+    #return r
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
@@ -950,9 +948,9 @@ def init(novaapi,tenantname,username,password,interface):
     IP_ADDR=getifip(interface)
     global CONFIG
     if 'CONFIG' not in globals():
-       CONFIG = ConfigParser.RawConfigParser()
-       CONFIG.read('irm.cfg')
-         
+        CONFIG = ConfigParser.RawConfigParser()
+        CONFIG.read('irm.cfg') 
+ 
 def default():
     INTERFACE = "eth0"
     print "No interface specified, using "+INTERFACE+" as default"

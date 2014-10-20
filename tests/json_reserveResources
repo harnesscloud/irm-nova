@@ -1,0 +1,27 @@
+{
+   "Resources":[
+      {
+         "ID":"nutshell",
+         "IP":"192.168.56.108",
+         "Type":"Machine",
+         "image":"3184a7b0-673e-4c17-9243-9241c914eec8",
+         "Attributes":{
+            "Cores":1,
+            "Frequency":2500,
+            "Memory":64,
+            "Disk":2
+         }
+      },
+      {
+         "ID":"/DC2/Rack2/IP2/Machine/app2",
+         "IP":"192.168.1.108",
+         "Type":"Machine",
+         "Attributes":{
+            "Cores":1,
+            "Frequency":2500,
+            "Memory":64,
+            "Disk":5
+         }
+      }
+   ]
+}
