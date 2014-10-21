@@ -170,6 +170,38 @@ def getHosts():
             return None
      logger.info("Completed!")
 
+def getListInstances():
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+    #headers = None       
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+
+    r = requests.get(public_url+'/servers', headers=headers)
+    #print r
+    try:
+        instanceList = []
+        response = r.json()
+        #print response
+        for instance in response['servers']:
+            #print instance['id']
+            instanceList.append(instance['id'])
+        #print instanceList
+        reservations = {"Reservations":instanceList}
+        print json.dumps(reservations)
+    except ValueError:
+        print "N-Irm: [getInstanceList] r = requests.get failed. Possible error with public_url or hostname"
+        print ""
+        logger.error("Error within public_url or hostname")
+    #print hostDetails    
+    
+    if reservations:
+       return reservations
+    else:
+       return None
+    logger.info("Completed!")
+
 # load resources information not available through nova from file in JSON format
 def loadHostList():
      logger.info("Called")
@@ -565,9 +597,14 @@ def verifyResources():
 
         option = "AvailableResources"
         resources = createListAvailableResources(host_list,public_url,token_id,option)
-        reply["Reservations"]
+        #print resources
+        #print reply
+        #reply["Reservations"]
+        #print reply
         reply.update(resources)
+        #print reply
         result = {"result":reply}
+        #print result
         jsondata = json.dumps(result)
         return jsondata
     
@@ -731,7 +768,8 @@ def reserveResources():
 
     except Exception.message, e:
         response.status = 400
-        if name: deleteFlavor(name)
+        if name:
+            deleteFlavor(name)
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
@@ -753,40 +791,77 @@ def releaseResources(ID):
     return r
     logger.info("Completed!")
 
+def deleteResources(reservations):
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+    try:
+        for ID in reservations['Reservations']:              
+            try:
+                #forces it to break is incorrect ID
+                info = getInstanceInfo(ID)
+                osstatus = info['server']['status']
+                #deletion of correct ID
+                r = requests.delete(public_url+'/servers/'+ID, headers=headers)
+            except TypeError:
+                print " "
+                raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
+                logger.error("Payload was incorrect. ID possibly missing or incorrect")
+        # Thrown to enforce exception below
+        return "DONE"
+        if ID in reservations['Reservations'] is None:               
+            raise UnboundLocalError
+    except UnboundLocalError:
+        raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
+        logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
+        return error
+
 # To be fixed with DELETE
 @route('/method/releaseResources/', method='POST')
 @route('/method/releaseResources', method='POST')
 def releaseResources():
     logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
     try:
-    	req = json.load(request.body)
+    	reservations = json.load(request.body)
     except ValueError:
     	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
     	print " "
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        try:
-    	    for ID in req['Reservations']:    	        
-                try:
-    	    	    #forces it to break is incorrect ID
-    	    	    info = getInstanceInfo(ID)
-    	            osstatus = info['server']['status']
-    	    	    #deletion of correct ID
-                    r = requests.delete(public_url+'/servers/'+ID, headers=headers)
-                except TypeError:
-                    print " "
-                    raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
-                    logger.error("Payload was incorrect. ID possibly missing or incorrect")
-            # Thrown to enforce exception below
+        
+        reply = deleteResources(reservations)
+        if "DONE" in reply:
             return { "result": { } }
-            if ID in req['Reservations'] is None:            	
-                raise UnboundLocalError
-        except UnboundLocalError:
-            raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
-            logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
+        else:
+            return { "result": reply }
+    #return r
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
-            
+    logger.info("Completed!")
+
+# To be fixed with DELETE
+@route('/method/releaseAllResources/', method='POST')
+@route('/method/releaseAllResources', method='POST')
+def releaseResources():
+    logger.info("Called")
+    try:
+        reservations = getListInstances()
+        print reservations
+    except ValueError:
+        print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
+        print " "
+        logger.error("Payload was empty or incorrect. A payload must be present and correct")
+    try:
+        
+        reply = deleteResources(reservations)
+        #reply = {"DONE"}
+        if "DONE" in reply:
+            return { "result": { } }
+        else:
+            return { "result": reply }
     #return r
     except Exception.message, e:
         response.status = 400

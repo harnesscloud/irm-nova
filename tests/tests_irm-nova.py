@@ -55,7 +55,7 @@ def apiTest(url,data=None):
 
     return result
 
-apiList=["/method/getResourceTypes","/method/getResourceTypes","/method/calculateResourceCapacity","/method/calculateResourceAgg","/method/reserveResources","/method/verifyResources","/method/releaseResources"]
+apiList=["/method/getResourceTypes","/method/getResourceTypes","/method/calculateResourceCapacity","/method/calculateResourceAgg","/method/reserveResources","/method/verifyResources","/method/releaseResources","/method/releaseAllResources"]
 
 
 def testAPI():
@@ -70,6 +70,14 @@ def testAPI():
                 decoded = json.loads(response)['result']
                 response = apiTest(url,json.dumps(decoded))
             elif "releaseResources" in api:
+                # need to wait to give time the spawned instance to be active before deleting it
+                time.sleep(5)
+                response = apiTest(url,json.dumps(decoded))
+            elif "releaseAllResources" in api:
+                # Need to do another reservation to test this API
+                response = apiTest(irm_nova_url+"/method/reserveResources",jsonReserveRes)
+                decoded = json.loads(response)['result']
+                print decoded
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
                 response = apiTest(url,json.dumps(decoded))
