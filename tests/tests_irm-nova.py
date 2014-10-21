@@ -77,7 +77,7 @@ def testAPI():
                 # Need to do another reservation to test this API
                 response = apiTest(irm_nova_url+"/method/reserveResources",jsonReserveRes)
                 decoded = json.loads(response)['result']
-                print decoded
+                #print decoded
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
                 response = apiTest(url,json.dumps(decoded))
