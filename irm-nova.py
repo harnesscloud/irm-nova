@@ -556,7 +556,7 @@ def verifyResources():
         logger.error("Payload was empty. A payload must be present")
     
    
-    print "in verifyResources"
+    #print "in verifyResources"
    # print reply
     #network = getNetworks()[0]
     #print network
@@ -837,20 +837,23 @@ def calculateResourceCapacity():
         	logger.error("Disk could not be found within [Resource][Attributes]- Possible speeling error within payload")
 
         for majorkey in req['Reserve']:
-           try: totCores = totCores - majorkey['Attributes']['Cores']
+           try:
+              if majorkey['Attributes'].has_key('Cores'):
+                totCores = totCores - majorkey['Attributes']['Cores']
            except KeyError: 
               print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Reserve'" 
               logger.error("totCores could not be assigned within 'Reserve'")
               pass
            try:
-              if majorkey['Attributes']['Memory'] in majorkey['Attributes']:
-                print "IN totMem"
+              if majorkey['Attributes'].has_key('Memory'):
                 totMem = totMem - majorkey['Attributes']['Memory']
            except KeyError: 
               print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Reserve'" 
               logger.error("totMem could not be assigned within 'Reserve'")
               pass
-           try: totDisk = totDisk - majorkey['Attributes']['Disk']
+           try:
+              if majorkey['Attributes'].has_key('Disk'):
+                totDisk = totDisk - majorkey['Attributes']['Disk']
            except KeyError: 
               print "N-Irm [calculateResourceCapacity] failed to assign totDisk in 'Reserve'" 
               logger.error("totDisk could not be assigned within 'Reserve'")
@@ -861,20 +864,22 @@ def calculateResourceCapacity():
            #except KeyError: pass
         for majorkey in req['Release']:
            try:
-              totCores = totCores + majorkey['Attributes']['Cores']
+              if majorkey['Attributes'].has_key('Cores'):
+                totCores = totCores + majorkey['Attributes']['Cores']
            except KeyError: 
            	  print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
            	  logger.error("totCores could not be assigned within 'Release'")
            	  pass
            try:
-              if majorkey['Attributes']['Memory'] in majorkey['Attributes']:
-                print "IN totMem"
+              if majorkey['Attributes'].has_key('Memory'):
                 totMem = totMem + majorkey['Attributes']['Memory']
            except KeyError: 
            	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
            	  logger.error("totMem could not be assigned within 'Release'") 
            	  pass
-           try: totDisk = totDisk + majorkey['Attributes']['Disk']
+           try:
+              if majorkey['Attributes'].has_key('Disk'):
+                totDisk = totDisk + majorkey['Attributes']['Disk']
            except KeyError: 
            	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'" 
            	  logger.error("totMem could not be assigned within 'Release'")
