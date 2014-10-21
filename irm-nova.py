@@ -58,7 +58,7 @@ import logging.handlers as handlers
 
 #Config and format for logging messages
 logger = logging.getLogger("Rotating Log")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
 ## Logging format
@@ -499,6 +499,50 @@ def getInstanceInfo(ID):
     #else:
          #return None
 
+def checkResources(data):
+    logger.info("Called")
+    #print "data in checkResources",data
+    reply = {"Reservations":[]}
+    req = data
+    try:            
+        for ID in req['Reservations']:
+            status = "false"
+            osstatus = "BUILD"               
+            try:
+                while osstatus == "BUILD":
+                    info = getInstanceInfo(ID)
+                    osstatus = info['server']['status']
+                    #print osstatus
+                if osstatus == "ACTIVE":
+                    status = "true"
+                    #print "setting status"
+
+            except TypeError:
+                print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
+                print " "
+                logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
+            IP = "100"
+            # change to private to vmnet in field below
+            for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
+                if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
+                    IP = private['addr']
+            #status = r.json()['server']['status']
+            response.set_header('Content-Type', 'application/json')
+            response.set_header('Accept', '*/*')
+            response.set_header('Allow', 'POST, HEAD')
+            data = {"ID":ID,"Ready":status,"Address":IP}
+            reply["Reservations"].append(data)
+        # When there is no ID, this case occurs    
+        if ID in req['Reservations'] is None:
+           raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
+           logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
+    except UnboundLocalError:
+        raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
+        logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
+
+    return reply
+    logger.info("Completed!")
+
 # To be fixed with GET
 @route('/method/verifyResources/', method='POST')
 @route('/method/verifyResources', method='POST')
@@ -510,45 +554,15 @@ def verifyResources():
         print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload"   
         print " "
         logger.error("Payload was empty. A payload must be present")
-    reply = {"Reservations":[]}
+    
    
+    print "in verifyResources"
    # print reply
     #network = getNetworks()[0]
     #print network
     try:
-    	try:            
-    	    for ID in req['Reservations']:
-            	status = "false"                
-                try:
-                    while status == "false":
-                        info = getInstanceInfo(ID)
-                        osstatus = info['server']['status']
-                        #print osstatus
-                        if osstatus == "ACTIVE": status = "true"
-                except TypeError:
-                	print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
-                	print " "
-                	logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
-                IP = "100"
-                # change to private to vmnet in field below
-                for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
-                    if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
-                        IP = private['addr']
-                #status = r.json()['server']['status']
-                response.set_header('Content-Type', 'application/json')
-                response.set_header('Accept', '*/*')
-                response.set_header('Allow', 'POST, HEAD')
-                data = {"ID":ID,"Ready":status,"Address":IP}
-                reply["Reservations"].append(data)
-            # When there is no ID, this case occurs    
-            if ID in req['Reservations'] is None:
-    	       raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
-    	       logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
-        except UnboundLocalError:
-            raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
-            logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
+    	reply = checkResources(req)
 
-        
         option = "AvailableResources"
         resources = createListAvailableResources(host_list,public_url,token_id,option)
         reply["Reservations"]
@@ -582,7 +596,7 @@ def reserveResources():
         	print " "
 
         cleanFlavors()
-        reply = {"Reservations":[]}
+        reservation = {"Reservations":[]}
         # loop through all requested resources
         name = ""
         #print req
@@ -615,7 +629,7 @@ def reserveResources():
                frequency = resource['Attributes']['Frequency']
            else:
                frequency = 2.4
-           print IP,vcpu,memory,disk,frequency, image
+           #print IP,vcpu,memory,disk,frequency, image
            #count = resource['NumInstances']
            #count = 1
            #print "COUNT: ",count
@@ -654,7 +668,7 @@ def reserveResources():
                                       "max_count": 1,\
                                       "availability_zone":host}}
                           if CONFIG.has_option('network', 'UUID'):
-                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
+                            dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
                              
                           #print dobj
                                                                                       
@@ -664,10 +678,11 @@ def reserveResources():
                           r = requests.post(public_url+'/servers', data, headers=headers)
                           #print r.json()
                           try:
-                          	ID = r.json()['server']['id']
+                            ID = r.json()['server']['id']
+                            #print r.json()
                           except KeyError, msg:
-                          	print "N-Irm: [reserveResources] Error within payload, please check spelling"
-                          logger.error("KeyError in payload, please check spelling of attributes")
+                            print "N-Irm: [reserveResources] Error within payload, please check spelling"
+                            logger.error("KeyError in payload, please check spelling of attributes")
                           #print getInstanceInfo(ID)
                           #print ID
                           #status = ""
@@ -676,14 +691,41 @@ def reserveResources():
                                   #    print "Status of "+name+" "+status
                           #instanceID = {"InfReservID":ID}
                           try:
-                          	reply["Reservations"].append(ID)
+                            reservation["Reservations"].append(ID)
                           except UnboundLocalError:
-                          	print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-              	          logger.error("Attempting to append the ID when it has not been assigned yet")
+                            print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
+              	            logger.error("Attempting to append the ID when it has not been assigned yet")
 
                           # delete flavor
                           deleteFlavor(name)
-        result = {"result":reply}
+        
+        #print "before url creation"
+        #url = "http://"+IP_ADDR+":"+PORT_ADDR+"/method/verifyResources"
+        #data = reply
+        #print "reply before", reply
+        #headers = {'Content-Type': 'application/json'}
+
+        try:
+            #print "before requests"
+            #print "data after", data
+            #r = requests.post(url, data, headers=headers)
+            reply = checkResources(reservation)
+            if "false" in reply:
+                #print "found false"
+                result = {"result":{}}
+            else:
+                #print "found true"
+                result = {"result":reservation}
+            #print "after requests"
+            #result = r.text
+        except Exception.message, e:
+            response.status = 400
+            error = {"message":e,"code":response.status}
+            return error
+
+        #print result
+        #return result
+        #result = {"result":reply}
         jsondata = json.dumps(result)
         return jsondata
 
@@ -732,12 +774,12 @@ def releaseResources():
     	            osstatus = info['server']['status']
     	    	    #deletion of correct ID
                     r = requests.delete(public_url+'/servers/'+ID, headers=headers)
-                    return { "result": { } }
                 except TypeError:
                     print " "
                     raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
                     logger.error("Payload was incorrect. ID possibly missing or incorrect")
             # Thrown to enforce exception below
+            return { "result": { } }
             if ID in req['Reservations'] is None:            	
                 raise UnboundLocalError
         except UnboundLocalError:
@@ -765,6 +807,7 @@ def calculateResourceCapacity():
         # get the body request
         try:
             req = json.load(request.body)
+
         except ValueError:
        	    print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout"
             print ""
@@ -799,7 +842,10 @@ def calculateResourceCapacity():
               print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Reserve'" 
               logger.error("totCores could not be assigned within 'Reserve'")
               pass
-           try: totMem = totMem - majorkey['Attributes']['Memory']
+           try:
+              if majorkey['Attributes']['Memory'] in majorkey['Attributes']:
+                print "IN totMem"
+                totMem = totMem - majorkey['Attributes']['Memory']
            except KeyError: 
               print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Reserve'" 
               logger.error("totMem could not be assigned within 'Reserve'")
@@ -814,12 +860,16 @@ def calculateResourceCapacity():
            #        maxFreq = majorkey['Attributes']['Frequency']
            #except KeyError: pass
         for majorkey in req['Release']:
-           try: totCores = totCores + majorkey['Attributes']['Cores']
+           try:
+              totCores = totCores + majorkey['Attributes']['Cores']
            except KeyError: 
            	  print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
            	  logger.error("totCores could not be assigned within 'Release'")
            	  pass
-           try: totMem = totMem + majorkey['Attributes']['Memory']
+           try:
+              if majorkey['Attributes']['Memory'] in majorkey['Attributes']:
+                print "IN totMem"
+                totMem = totMem + majorkey['Attributes']['Memory']
            except KeyError: 
            	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
            	  logger.error("totMem could not be assigned within 'Release'") 
