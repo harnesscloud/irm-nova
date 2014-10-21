@@ -868,10 +868,10 @@ def releaseResources():
             return { "result": reply }
     #return r
 
-            if ID in req['Reservations'] is None:            	
-                raise UnboundLocalError
-        except UnboundLocalError:
-            raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
+        if ID in req['Reservations'] is None:            	
+            raise UnboundLocalError
+    except UnboundLocalError:
+        raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
         return { "result": { } }
 
 
