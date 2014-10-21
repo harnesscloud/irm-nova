@@ -556,7 +556,7 @@ def verifyResources():
         logger.error("Payload was empty. A payload must be present")
     
    
-    print "in verifyResources"
+    #print "in verifyResources"
    # print reply
     #network = getNetworks()[0]
     #print network
@@ -813,60 +813,93 @@ def calculateResourceCapacity():
            print ""
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
-        exceed_capacity = False  
-        base = req["Resource"]         
-        if base["Type"] == "Machine":           
-   	     cores = 0
-   	     memory = 0
-   	     disk = 0
-   	     # release
-   	     if "Release" in req:
-			     release = req["Release"]
-			     for r in release:
-			        attrib = r["Attributes"]
-			        if "Cores" in attrib:
-			           cores = cores + int(attrib["Cores"])
-			        if "Memory" in attrib:
-			           memory = memory + int(attrib["Memory"])
-			        if "Disk" in attrib:
-			           disk = disk + int(attrib["Disk"])
-			                
-			  # reserve
-   	     if "Reserve" in req:
-			     reserve = req["Reserve"]
-			     for r in reserve:
-			        attrib = r["Attributes"]
-			        if "Cores" in attrib:
-			           cores = cores - int(attrib["Cores"])
-			        if "Memory" in attrib:
-			           memory = memory - int(attrib["Memory"])
-			        if "Disk" in attrib:
-			           disk = disk - int(attrib["Disk"])
-			  
-   	     totalCores = 0
-   	     totalMemory = 0
-   	     totalDisk = 0   
-   	     attribs = base["Attributes"]     
-   	     if ("Cores" in attribs):      
-	           totalCores = int(attribs["Cores"]) + cores
-	           attribs["Cores"] = totalCores
-   	     if ("Memory" in attribs):      
-	           totalMemory = int(attribs["Memory"]) + memory
-	           attribs["Memory"] = totalMemory
-   	     if ("Disk" in attribs):      
-	           totalDisk = int(attribs["Disk"]) + disk
-	           attribs["Disk"] = totalDisk
-	        
-   	     if (totalCores < 0 or totalMemory < 0 or totalDisk < 0):
-	           reply = { }
-   	     else:        
-	           reply = {"Resource":{"Type":"Machine",
-                       "Attributes":attribs}}
-   	     result = {"result":reply}
-   	     jsondata = json.dumps(result)
-   	     return jsondata
+        cores = 0
+        mem = 0
+        disk = 0
+        
+        # optional reserve
+        if 'Reserve' in req:
+		     for majorkey in req['Reserve']:
+		        try:
+		           if majorkey['Attributes'].has_key('Cores'):
+		             cores = cores - majorkey['Attributes']['Cores']
+		        except KeyError: 
+		           print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Reserve'" 
+		           logger.error("totCores could not be assigned within 'Reserve'")
+		           pass
+		        try:
+		           if majorkey['Attributes'].has_key('Memory'):
+		             mem = mem - majorkey['Attributes']['Memory']
+		        except KeyError: 
+		           print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Reserve'" 
+		           logger.error("totMem could not be assigned within 'Reserve'")
+		           pass
+		        try:
+		           if majorkey['Attributes'].has_key('Disk'):
+		             disk = disk - majorkey['Attributes']['Disk']
+		        except KeyError: 
+		           print "N-Irm [calculateResourceCapacity] failed to assign totDisk in 'Reserve'" 
+		           logger.error("totDisk could not be assigned within 'Reserve'")
+		           pass
+		        #try: 
+		        #    if maxFreq < majorkey['Attributes']['Frequency']:
+		        #        maxFreq = majorkey['Attributes']['Frequency']
+		        #except KeyError: pass
+		  # optional release     
+        if 'Release' in req:
+		     for majorkey in req['Release']:
+		        try:
+		           if majorkey['Attributes'].has_key('Cores'):
+		             cores = cores + majorkey['Attributes']['Cores']
+		        except KeyError: 
+		        	  print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
+		        	  logger.error("totCores could not be assigned within 'Release'")
+		        	  pass
+		        try:
+		           if majorkey['Attributes'].has_key('Memory'):
+		             mem = mem + majorkey['Attributes']['Memory']
+		        except KeyError: 
+		        	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
+		        	  logger.error("totMem could not be assigned within 'Release'") 
+		        	  pass
+		        try:
+		           if majorkey['Attributes'].has_key('Disk'):
+		             disk = disk + majorkey['Attributes']['Disk']
+		        except KeyError: 
+		        	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'" 
+		        	  logger.error("totMem could not be assigned within 'Release'")
+		        	  pass
+		        #try:
+		        #    if maxFreq < majorkey['Attributes']['Frequency']:
+		        #        maxFreq = majorkey['Attributes']['Frequency']
+		        #except KeyError: pass
+        try:
+            rType = req['Resource']['Type']
+        except AttributeError:
+        	print "Failed to assign Resource type to 'rtype'"
+        	logger.error("Unable to assign Resource type to 'rtype'")
+        #print totCores,maxFreq,totMem,totDisk
+        
+        # only return the attributes included in 'Resource'
+        attribs = req['Resource']['Attributes']
+        # compute if we exceed capacity - if we do, we must return { }
+        exceed_capacity = False
+        if attribs.has_key("Cores"):
+           attribs["Cores"] = attribs["Cores"] + cores
+           exceed_capacity = attribs["Cores"] < 0           
+        if (not exceed_capacity) and attribs.has_key("Memory"):
+           attribs["Memory"] = attribs["Memory"] + mem          
+           exceed_capacity = attribs["Memory"] < 0                       
+        if (not exceed_capacity) and attribs.has_key("Disk"):
+           attribs["Disk"] = attribs["Disk"] + disk
+           exceed_capacity = attribs["Disk"] < 0                                    
+        if exceed_capacity:
+           reply = { }
         else:
-           return json.dumps({})
+           reply = {"Resource":{"Type":rType,"Attributes":attribs}}
+        result = {"result":reply}
+        jsondata = json.dumps(result)
+        return jsondata
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
