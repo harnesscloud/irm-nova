@@ -379,7 +379,8 @@ def registerIRM():
        {\
        "Manager":"IRM",\
        "Hostname":IP_ADDR,\
-       "Port":PORT_ADDR\
+       "Port":PORT_ADDR,\
+       "Name":"IRM-NOVA"\
        })
     except AttributeError:
     	logger.error("Failed to json.dumps into data")
