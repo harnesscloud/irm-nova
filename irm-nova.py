@@ -90,6 +90,7 @@ def createToken(os_api_url, tenantName, username, password):
      r = requests.post(token_url, data, headers=headers)
      try:
         token_id = r.json()['access']['token']['id']
+        print r.text
      except AttributeError:
         print "N-Irm: [createToken] Unable to use r variable with json. Fault with token_url, or data variables"
         logger.error("Fault with token_url or data variable, caused r to be unusable with json")
@@ -173,7 +174,8 @@ def getHosts():
 def getListInstances():
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
-    #headers = None       
+    #headers = None
+    subname = "HARNESS"      
     if str(token_id) not in str(headers):
         raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
@@ -185,11 +187,13 @@ def getListInstances():
         response = r.json()
         #print response
         for instance in response['servers']:
-            #print instance['id']
-            instanceList.append(instance['id'])
+            #print "INSTANCE:",instance['name']
+            if subname in instance['name']:
+                #print "GOT ",subname, instance
+                instanceList.append(instance['id'])
         #print instanceList
         reservations = {"Reservations":instanceList}
-        print json.dumps(reservations)
+        #print json.dumps(reservations)
     except ValueError:
         print "N-Irm: [getInstanceList] r = requests.get failed. Possible error with public_url or hostname"
         print ""
@@ -637,17 +641,18 @@ def reserveResources():
         reservation = {"Reservations":[]}
         # loop through all requested resources
         name = ""
-        print "============> ", req['Resources']
+        #print "============> ", req['Resources']
 
         for resource in req['Resources']:
            #print resource
            # load values
            IP = resource['IP']
+           #print "Image", resource['Image']
            if 'Image' in resource:
                image = resource['Image']
            else:
                image = CONFIG.get('CRS', 'DEFAULT_IMAGE')
-
+           #print "Image after", image
            user_data = ''
            if 'UserData' in resource:
                user_data = resource['UserData']
@@ -697,6 +702,7 @@ def reserveResources():
                           # build body for nova api
                           # create instances up to the number in the request
                           #for i in xrange(0,count):
+                          #print "Image after", image
                           dobj = {"server" : {\
                                       "name" : name,\
                                       "imageRef" : image, \
@@ -713,10 +719,11 @@ def reserveResources():
                           #print dobj
                                                                                       
                           data = json.dumps(dobj)
+                          #print "data before creating instance: ", data
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
                           r = requests.post(public_url+'/servers', data, headers=headers)
-                          print "====> ", str(r.json())
+                          #print "====> ", str(r.json())
                           #print r.json()
                           try:
                             ID = r.json()['server']['id']
@@ -748,7 +755,7 @@ def reserveResources():
 
         try:
             #print "before requests"
-            #print "data after", data
+            #print "data before", reservation
             #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
             if "false" in reply:
@@ -854,7 +861,7 @@ def releaseResources():
     logger.info("Called")
     try:
         reservations = getListInstances()
-        print reservations
+        #print reservations
     except ValueError:
         print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
         print " "
