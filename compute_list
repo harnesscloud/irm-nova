@@ -55,7 +55,6 @@
             "Disk":0.003
          }
       },
-      
       {
          "host_name":"axel07",
          "location":"/DataCenter1/Rack1/",
@@ -72,6 +71,17 @@
          "location":"/DataCenter1/Rack1/",
          "frequency":2400,
          "IP":"146.169.2.51",
+         "Cost":{ 
+            "Cores":10,
+            "Memory":2,
+            "Disk":12
+          }
+      },
+      {
+         "host_name":"axel07",
+         "location":"/DataCenter1/Rack1/",
+         "frequency":2400,
+         "IP":"172.28.128.3",
          "Cost":{ 
             "Cores":10,
             "Memory":2,
