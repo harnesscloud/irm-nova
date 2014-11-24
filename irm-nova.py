@@ -90,7 +90,7 @@ def createToken(os_api_url, tenantName, username, password):
      r = requests.post(token_url, data, headers=headers)
      try:
         token_id = r.json()['access']['token']['id']
-        print r.text
+        #print r.text
      except AttributeError:
         print "N-Irm: [createToken] Unable to use r variable with json. Fault with token_url, or data variables"
         logger.error("Fault with token_url or data variable, caused r to be unusable with json")
@@ -143,6 +143,7 @@ def getHosts():
      #print token_id
      r = requests.get(public_url+'/os-hosts', headers=headers)
      
+     print r.text
     # print headers
     # print "public url"
     # print public_url
@@ -538,44 +539,50 @@ def getInstanceInfo(ID):
 
 def checkResources(data):
     logger.info("Called")
-    #print "data in checkResources",data
+    print "data in checkResources",data
+    
+    
     reply = {"Reservations":[]}
-    req = data
-    try:            
-        for ID in req['Reservations']:
-            status = "false"
-            osstatus = "BUILD"               
-            try:
-                while osstatus == "BUILD":
-                    info = getInstanceInfo(ID)
-                    osstatus = info['server']['status']
-                    #print osstatus
-                if osstatus == "ACTIVE":
-                    status = "true"
-                    #print "setting status"
+    if data['Reservations']:
+        #print "Data not empty"
+        req = data
+        try:            
+            for ID in req['Reservations']:
+                status = "false"
+                osstatus = "BUILD"               
+                try:
+                    while osstatus == "BUILD":
+                        info = getInstanceInfo(ID)
+                        osstatus = info['server']['status']
+                        #print osstatus
+                    if osstatus == "ACTIVE":
+                        status = "true"
+                        #print "setting status"
 
-            except TypeError:
-                print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
-                print " "
-                logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
-            IP = "100"
-            # change to private to vmnet in field below
-            for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
-                if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
-                    IP = private['addr']
-            #status = r.json()['server']['status']
-            response.set_header('Content-Type', 'application/json')
-            response.set_header('Accept', '*/*')
-            response.set_header('Allow', 'POST, HEAD')
-            data = {"ID":ID,"Ready":status,"Address":IP}
-            reply["Reservations"].append(data)
-        # When there is no ID, this case occurs    
-        if ID in req['Reservations'] is None:
-           raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
-           logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
-    except UnboundLocalError:
-        raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
-        logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
+                except TypeError:
+                    print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
+                    print " "
+                    logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
+                IP = "100"
+                # change to private to vmnet in field below
+                for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
+                    if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
+                        IP = private['addr']
+                #status = r.json()['server']['status']
+                response.set_header('Content-Type', 'application/json')
+                response.set_header('Accept', '*/*')
+                response.set_header('Allow', 'POST, HEAD')
+                data = {"ID":ID,"Ready":status,"Address":IP}
+                reply["Reservations"].append(data)
+            # When there is no ID, this case occurs    
+            if ID in req['Reservations'] is None:
+               raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
+               logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
+        except UnboundLocalError:
+            raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
+            logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
+    else:
+        print "Data empty"
 
     return reply
     logger.info("Completed!")
@@ -597,6 +604,7 @@ def verifyResources():
    # print reply
     #network = getNetworks()[0]
     #print network
+    print "===> NETWORKS:", getNetworks()
     try:
     	reply = checkResources(req)
 
@@ -723,7 +731,7 @@ def reserveResources():
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
                           r = requests.post(public_url+'/servers', data, headers=headers)
-                          #print "====> ", str(r.json())
+                          print "====> ", str(r.json())
                           #print r.json()
                           try:
                             ID = r.json()['server']['id']
@@ -755,7 +763,7 @@ def reserveResources():
 
         try:
             #print "before requests"
-            #print "data before", reservation
+            print "data before", reservation
             #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
             if "false" in reply:
@@ -1093,12 +1101,17 @@ def init(novaapi,tenantname,username,password,interface):
     #print public_url
     global host_list
     host_list = loadHostList()
-    global IP_ADDR
-    IP_ADDR=getifip(interface)
     global CONFIG
     if 'CONFIG' not in globals():
         CONFIG = ConfigParser.RawConfigParser()
-        CONFIG.read('irm.cfg') 
+        CONFIG.read('irm.cfg')
+    global IP_ADDR
+    if CONFIG.get('main', 'IRM_ADDRESS') != "":
+        IP_ADDR=CONFIG.get('main', 'IRM_ADDRESS')
+    elif interface != "":
+        IP_ADDR=getifip(interface)
+    else:
+        IP_ADDR="0.0.0.0"
  
 def default():
     INTERFACE = "eth0"
@@ -1150,6 +1163,7 @@ Copyright 2012-2013 SAP Ltd
        global CONFIG
        CONFIG = ConfigParser.RawConfigParser()
        CONFIG.read(options.config)
+       
        INTERFACE = CONFIG.get('main', 'IRM_INTERFACE')
        PORT_ADDR = CONFIG.get('main', 'IRM_PORT')
        NOVAAPI = CONFIG.get('main', 'NOVA_ENDPOINT')
