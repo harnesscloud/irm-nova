@@ -1,10 +1,10 @@
 {
    "Resources":[
-      {
+     {
          "ID":"nutshell",
          "IP":"192.168.56.108",
          "Type":"Machine",
-         "image":"3184a7b0-673e-4c17-9243-9241c914eec8",
+         "Image":"3184a7b0-673e-4c17-9243-9241c914eec8",
          "Attributes":{
             "Cores":1,
             "Frequency":2500,
@@ -16,7 +16,20 @@
          "ID":"nutshell",
          "IP":"192.168.56.108",
          "Type":"Machine",
-         "image":"3184a7b0-673e-4c17-9243-9241c914eec8",
+         "Image":"3184a7b0-673e-4c17-9243-9241c914eec8",
+         "Attributes":{
+            "Cores":1,
+            "Frequency":2500,
+            "Memory":64,
+            "Disk":2
+         }
+      }
+      ,
+     {
+         "ID":"axel07",
+         "IP":"172.28.128.3",
+         "Type":"Machine",
+         "Image":"36fe5490-5d1b-41ff-935b-d066f0830483",
          "Attributes":{
             "Cores":1,
             "Frequency":2500,
