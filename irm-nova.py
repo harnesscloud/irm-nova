@@ -1106,7 +1106,7 @@ def init(novaapi,tenantname,username,password,interface):
         CONFIG = ConfigParser.RawConfigParser()
         CONFIG.read('irm.cfg')
     global IP_ADDR
-    if CONFIG.get('main', 'IRM_ADDRESS') != "":
+    if CONFIG.has_option('main', 'IRM_ADDRESS') != "":
         IP_ADDR=CONFIG.get('main', 'IRM_ADDRESS')
     elif interface != "":
         IP_ADDR=getifip(interface)
