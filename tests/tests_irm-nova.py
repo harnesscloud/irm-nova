@@ -66,9 +66,14 @@ def testAPI():
         try:
             if "reserveResources" in api:
                 response = apiTest(url,jsonReserveRes)
+                #print "RESERVER TEST:",json.loads(response)['result']['Reservations']
+                if not json.loads(response)['result']['Reservations']:
+                    error = "Data empty"
             elif "verifyResources" in api:
                 decoded = json.loads(response)['result']
                 response = apiTest(url,json.dumps(decoded))
+                if not json.loads(response)['result']['Reservations']:
+                    error = "Data empty"
             elif "releaseResources" in api:
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)

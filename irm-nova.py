@@ -143,7 +143,7 @@ def getHosts():
      #print token_id
      r = requests.get(public_url+'/os-hosts', headers=headers)
      
-     print r.text
+     #print r.text
     # print headers
     # print "public url"
     # print public_url
@@ -330,7 +330,8 @@ def getAvailableResources():
         r = {"result":resources}       
 
         result = json.dumps(r)
-        
+        #print getImageUUIDbyName("conpaas")
+        #print getNetUUIDbyName("private")
     	             
     except Exception.message, e:
        response.status = 400
@@ -469,6 +470,42 @@ def getInstanceStatus(ID):
          
     logger.info("Completed!")
 
+def getImageUUIDbyName(name):
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+    
+    #print "public_url:",public_url
+    r = requests.get(public_url+'/images', headers=headers)
+    #print "GLANCE IMAGES",r.text
+
+    for image in r.json()["images"]:
+        if image["name"] == name:
+            imageId = image["id"]
+
+    return imageId
+
+def getNetUUIDbyName(name):
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+    
+    #print "public_url:",public_url
+    r = requests.get(public_url+'/os-networks', headers=headers)
+    #print "GLANCE IMAGES",r.text
+
+    for net in r.json()["networks"]:
+        if net["label"] == name:
+            netId = net["id"]
+
+    return netId
+
 
 def getNetworks():
     logger.info("Called")
@@ -539,7 +576,7 @@ def getInstanceInfo(ID):
 
 def checkResources(data):
     logger.info("Called")
-    print "data in checkResources",data
+    #print "data in checkResources before",data
     
     
     reply = {"Reservations":[]}
@@ -565,9 +602,11 @@ def checkResources(data):
                     logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
                 IP = "100"
                 # change to private to vmnet in field below
+                #print info['server']
                 for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                     if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                         IP = private['addr']
+                        #print "IP:", IP
                 #status = r.json()['server']['status']
                 response.set_header('Content-Type', 'application/json')
                 response.set_header('Accept', '*/*')
@@ -584,6 +623,7 @@ def checkResources(data):
     else:
         print "Data empty"
 
+    #print "reply in checkResources after",reply
     return reply
     logger.info("Completed!")
 
@@ -604,7 +644,7 @@ def verifyResources():
    # print reply
     #network = getNetworks()[0]
     #print network
-    print "===> NETWORKS:", getNetworks()
+    #print "===> NETWORKS:", getNetworks()
     try:
     	reply = checkResources(req)
 
@@ -657,9 +697,12 @@ def reserveResources():
            IP = resource['IP']
            #print "Image", resource['Image']
            if 'Image' in resource:
-               image = resource['Image']
+               image = getImageUUIDbyName(resource['Image'])
            else:
-               image = CONFIG.get('CRS', 'DEFAULT_IMAGE')
+               if CONFIG.has_option('CRS','IMAGE_NAME'):
+                   image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
+               elif CONFIG.has_option('CRS','DEFAULT_IMAGE'):
+                   image = CONFIG.get('CRS', 'DEFAULT_IMAGE')
            #print "Image after", image
            user_data = ''
            if 'UserData' in resource:
@@ -714,14 +757,16 @@ def reserveResources():
                           dobj = {"server" : {\
                                       "name" : name,\
                                       "imageRef" : image, \
-                                      #"imageRef" : "162bb278-76cf-4dd2-8560-e3367050d32a", \
-                                      #"imageRef" : "3184a7b0-673e-4c17-9243-9241c914eec8",\
-                                      #"imageRef" : "185982bc-5eab-4cde-8061-02d519dca5ef",\
                                       "flavorRef" : name,\
                                       "min_count": 1,\
                                       "max_count": 1,\
+                                      "user_data": user_data,\
                                       "availability_zone":host}}
-                          if CONFIG.has_option('network', 'UUID'):
+                          if CONFIG.has_option('network', 'NET_ID'):
+                            UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
+                            dobj["server"]["networks"] = [ { "uuid": UUID } ]
+                            #print "getting net UUID"
+                          elif CONFIG.has_option('network', 'UUID'):
                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
                              
                           #print dobj
@@ -731,7 +776,7 @@ def reserveResources():
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
                           r = requests.post(public_url+'/servers', data, headers=headers)
-                          print "====> ", str(r.json())
+                          #print "====> ", str(r.json())
                           #print r.json()
                           try:
                             ID = r.json()['server']['id']
@@ -763,7 +808,7 @@ def reserveResources():
 
         try:
             #print "before requests"
-            print "data before", reservation
+            #print "data before", reservation
             #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
             if "false" in reply:
@@ -1106,7 +1151,7 @@ def init(novaapi,tenantname,username,password,interface):
         CONFIG = ConfigParser.RawConfigParser()
         CONFIG.read('irm.cfg')
     global IP_ADDR
-    if CONFIG.has_option('main', 'IRM_ADDRESS') != "":
+    if CONFIG.has_option('main', 'IRM_ADDRESS') and CONFIG.get('main', 'IRM_ADDRESS') != "":
         IP_ADDR=CONFIG.get('main', 'IRM_ADDRESS')
     elif interface != "":
         IP_ADDR=getifip(interface)
