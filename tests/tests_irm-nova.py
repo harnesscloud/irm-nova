@@ -42,11 +42,17 @@ def is_json(myjson):
   return True
 
 # currently this is just using POST, but should be updated with more verbs once the changes are done to the API
-def apiTest(url,data=None):
+def apiTest(url,verb,data=None):
     headers = {'Content-Type': 'application/json'}
 
     try:
-        r = requests.post(url, data, headers=headers)
+        r = requests.Response
+        if "GET" in verb:
+            r = requests.get(url, data=data, headers=headers)
+        elif verb == "POST":
+            r = requests.post(url, data, headers=headers)
+        elif verb == "DELETE":
+            r = requests.delete(url, data=data, headers=headers)
         result = r.text
     except Exception.message, e:
        response.status = 400
@@ -55,7 +61,7 @@ def apiTest(url,data=None):
 
     return result
 
-apiList=["/method/getResourceTypes","/method/getResourceTypes","/method/calculateResourceCapacity","/method/calculateResourceAgg","/method/reserveResources","/method/verifyResources","/method/releaseResources","/method/releaseAllResources"]
+apiList=["/method/getAvailableResources","/method/getResourceTypes","/method/calculateResourceCapacity","/method/reserveResources","/method/verifyResources","/method/releaseResources","/method/releaseAllResources"]
 
 
 def testAPI():
@@ -65,31 +71,33 @@ def testAPI():
     
         try:
             if "reserveResources" in api:
-                response = apiTest(url,jsonReserveRes)
+                response = apiTest(url,"POST",jsonReserveRes)
                 #print "RESERVER TEST:",json.loads(response)['result']['Reservations']
                 if not json.loads(response)['result']['Reservations']:
                     error = "Data empty"
             elif "verifyResources" in api:
                 decoded = json.loads(response)['result']
-                response = apiTest(url,json.dumps(decoded))
+                response = apiTest(url,"GET",json.dumps(decoded))
                 if not json.loads(response)['result']['Reservations']:
                     error = "Data empty"
             elif "releaseResources" in api:
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
-                response = apiTest(url,json.dumps(decoded))
+                response = apiTest(url,"DELETE",json.dumps(decoded))
             elif "releaseAllResources" in api:
                 # Need to do another reservation to test this API
-                response = apiTest(irm_nova_url+"/method/reserveResources",jsonReserveRes)
+                response = apiTest(irm_nova_url+"/method/reserveResources","POST",jsonReserveRes)
                 decoded = json.loads(response)['result']
                 #print decoded
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
-                response = apiTest(url,json.dumps(decoded))
+                response = apiTest(url,"DELETE",json.dumps(decoded))
             elif "calculateResourceCapacity" in api:
-                response = apiTest(url,jsonCalcResCap)
-            elif "calculateResourceAgg" in api:
-                response = apiTest(url,jsonCalcResAgg)
+                response = apiTest(url,"GET",jsonCalcResCap)
+#            elif "calculateResourceAgg" in api:
+#                response = apiTest(url,"POST",jsonCalcResAgg)
+            elif "get" in api:
+                response = apiTest(url,"GET",jsonCalcResAgg)
             else:
                 response = apiTest(url)
         except Exception.message, e:
