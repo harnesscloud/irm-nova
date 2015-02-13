@@ -57,6 +57,10 @@ handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,bac
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+with open("templates/json_getResourceTypes") as f:
+    jsonGetResT = f.read()
+
+jsonGetResT = json.loads(jsonGetResT)['Output']
 
 ######################################################## API ###################################################################
 
@@ -96,8 +100,8 @@ def getResourceTypes():
     try:
         #data = createListAvailableResources(host_list,public_url,token_id)
         types = {"Types":[]}
-        data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"},"Image":{"Description":"Image name","DataType":"string"},"UserData":{"Description":"User custom data","DataType":"string"}}}
-        types["Types"].append(data)
+        #data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"},"Image":{"Description":"Image name","DataType":"string"},"UserData":{"Description":"User custom data","DataType":"string"}}}
+        types["Types"].append(jsonGetResT)
                
         result = {"result":types}
         r = json.dumps(result)
@@ -152,8 +156,8 @@ def verifyResources():
         #print reply
         result = {"result":reply}
         #print result
-        jsondata = json.dumps(result)
-        return jsondata
+        #jsondata = json.dumps(result)
+        return result
     
     except Exception.message, e:
         response.status = 400

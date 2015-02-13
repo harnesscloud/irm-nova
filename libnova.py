@@ -26,8 +26,12 @@ formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(file
 handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
 ## Logging format
 handler.setFormatter(formatter)
-
 logger.addHandler(handler)
+
+with open("templates/json_getAvailableResources") as f:
+        jsonGetAvRes = f.read()
+
+jsonGetAvResOutputRes = json.loads(jsonGetAvRes)['Output']['Resources'][0]
 
 global CONFIG
 if 'CONFIG' not in globals():
@@ -40,8 +44,8 @@ def getIP(url):
     try:
         result = address_regexp.search(url)
     except AttributeError:
-    	print "N-Irm: [getIP] Failed to get IP. result variable could not search url. Possible url fault"
-    	logger.error("url error caused result variable to have incorrect assignment")
+        print "N-Irm: [getIP] Failed to get IP. result variable could not search url. Possible url fault"
+        logger.error("url error caused result variable to have incorrect assignment")
 
     if result:
             return result.group()
@@ -102,10 +106,10 @@ def getEndPoint(os_api_url, token_id):
 # get hosts from nova and return a list
 def getHosts():
      logger.info("Called")
-	## regex check that public url begins with http:// 
-	## token id check that it is of the correct length [32]
-	## general try except in the event of an unexpected error, recommending that 
-	## they check the public url, as named urls may not have been resolved
+    ## regex check that public url begins with http:// 
+    ## token id check that it is of the correct length [32]
+    ## general try except in the event of an unexpected error, recommending that 
+    ## they check the public url, as named urls may not have been resolved
 
      headers = {'X-Auth-Token': token_id}
      #headers = None
@@ -125,12 +129,12 @@ def getHosts():
        logger.error("Failed to assign headers. Possible fault in token_id")
      
      try:
-		# this needs to be fixed with a more appropriate error check
-     	if r.json():
-			print "Request OK" 
+        # this needs to be fixed with a more appropriate error check
+        if r.json():
+            print "Request OK" 
      except ValueError:
-     	print "N-Irm: [getHosts] r = requests.get failed. Possible error with public_url or hostname"
-     	logger.error("Error within public_url or hostname. ")
+        print "N-Irm: [getHosts] r = requests.get failed. Possible error with public_url or hostname"
+        logger.error("Error within public_url or hostname. ")
 
      hosts = []
      for majorkey in r.json()['hosts']:
@@ -245,17 +249,17 @@ def getHostDetails(hostname):
     headers = {'X-Auth-Token': token_id}
     #headers = None       
     if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
+        raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
 
     r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
     #print r
     try:
-    	hostDetails = r.json()
+        hostDetails = r.json()
     except ValueError:
-    	print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
-    	print ""
-    	logger.error("Error within public_url or hostname")
+        print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
+        print ""
+        logger.error("Error within public_url or hostname")
     #print hostDetails    
     
     if hostDetails:
@@ -265,72 +269,84 @@ def getHostDetails(hostname):
     logger.info("Completed!")
 
 def createListAvailableResources(host_list,public_url,token_id,option):
-     # create response structure
-     logger.info("Called")
-     resources = {option:[]}   
-     h_list = getHosts()
+    # create response structure
+    
+
+    logger.info("Called")
+    resources = {option:[]}   
+    h_list = getHosts()
      
-     # loop through all hosts
-     for novah in h_list:
-         for h in host_list['Machine']:
-           if novah == h['host_name']:
-             #host_split = h.split()
-             # load values
-             hostIP = h['IP']
-             hostName = h['host_name']
-             #costCores = h['Cost']['Cores']
-             #costMemory = h['Cost']['Memory']
-             #costDisk = h['Cost']['Disk']
-             frequency = h['frequency']
-             location = h['location']
-             #CRSID = location+hostIP+"/machine/"+hostName
-            
-                             
-             #print hostName,costCores,costMemory,costDisk
-             # get details from nova
-             
-             hostDetails = getHostDetails(hostName)
-             nCores = 0
-             Memory = 0
-             total_cpu = 0
-             used_cpu = 0
-             total_mem = 0
-             used_mem = 0
-             total_disk = 0
-             used_disk = 0
+    # loop through all hosts
+    for novah in h_list:
+        for h in host_list['Machine']:
+            if novah == h['host_name']:
+                #host_split = h.split()
+                # load values
+                hostIP = h['IP']
+                hostName = h['host_name']
+                #costCores = h['Cost']['Cores']
+                #costMemory = h['Cost']['Memory']
+                #costDisk = h['Cost']['Disk']
+                frequency = h['frequency']
+                location = h['location']
+                #CRSID = location+hostIP+"/machine/"+hostName
+                
+                                 
+                #print hostName,costCores,costMemory,costDisk
+                # get details from nova
+                 
+                hostDetails = getHostDetails(hostName)
+                nCores = 0
+                memory = 0
+                total_cpu = 0
+                used_cpu = 0
+                total_mem = 0
+                used_mem = 0
+                total_disk = 0
+                used_disk = 0
 
              
-             # load detail from nova reply
-             if 'host' in hostDetails:
-                 for majorkey in hostDetails['host']:
-		     if majorkey['resource']['project'] == '(total)':
-		         total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
-		         total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
-		         total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
-		     if majorkey['resource']['project'] == '(used_now)':
-		         used_mem = majorkey['resource']['memory_mb']
-		         used_cpu = majorkey['resource']['cpu']
-		         used_disk = majorkey['resource']['disk_gb']
-                     # calculate available resources
-                     nCores = total_cpu - used_cpu
-                     Memory = int(total_mem - used_mem - 0.1 * total_mem)
-                     disk = total_disk - used_disk
-                 # build response
-                 data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":Memory,"Disk":disk}}
-                 resources[option].append(data)
-                 #print resources
-             #r = json.dumps(resources)
-     if "{'Resources': []}" in resources:
-         raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
-         logger.error("Failed to append 'data' variable. 'Resources' variable empty")
+                 # load detail from nova reply
+                if 'host' in hostDetails:
+                    for majorkey in hostDetails['host']:
+                        if majorkey['resource']['project'] == '(total)':
+                            total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
+                            total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
+                            total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
+                        if majorkey['resource']['project'] == '(used_now)':
+                            used_mem = majorkey['resource']['memory_mb']
+                            used_cpu = majorkey['resource']['cpu']
+                            used_disk = majorkey['resource']['disk_gb']
+                        # calculate available resources
+                        nCores = total_cpu - used_cpu
+                        memory = int(total_mem - used_mem - 0.1 * total_mem)
+                        disk = total_disk - used_disk
+                    # build response
+                    jsonGetAvResOutputRes['IP'] = hostIP
+                    jsonGetAvResOutputRes['ID'] = hostName
+                    jsonGetAvResOutputRes['Attributes']['Cores'] = nCores
+                    jsonGetAvResOutputRes['Attributes']['Frequency'] = frequency
+                    jsonGetAvResOutputRes['Attributes']['Memory'] = memory
+                    jsonGetAvResOutputRes['Attributes']['Disk'] = disk
+
+                    #data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":memory,"Disk":disk}}
+                    resources[option].append(jsonGetAvResOutputRes)
+                    #print "jsonGetAvResOutputRes",json.dumps(jsonGetAvResOutputRes)
+                    #print "data",data
+                    #resources[option].append(data)
+                    #print resources
+            #r = json.dumps(resources)
+    if "{'Resources': []}" in resources:
+        raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
+        logger.error("Failed to append 'data' variable. 'Resources' variable empty")
 
      
-     logger.info("Completed!")
+    logger.info("Completed!")
 
-     if resources:
-         return resources
-     else:
-         return None
+    if resources:
+        return resources
+    else:
+        return None
 
 def registerIRM():
     logger.info("Called")
@@ -345,7 +361,7 @@ def registerIRM():
        "Name":"IRM-NOVA"\
        })
     except AttributeError:
-    	logger.error("Failed to json.dumps into data")
+        logger.error("Failed to json.dumps into data")
    
     # add here a check if that flavor name exists already and in that case return the correspondent ID
     # without trying to create a new one as it will fail
@@ -358,8 +374,8 @@ def createFlavor(name,vcpu,ram,disk):
     headers = {'content-type': 'application/json','X-Auth-Token': token_id}
     
     if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [createFlavor] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
+        raise AttributeError("N-Irm: [createFlavor] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
     
     data = json.dumps({"flavor": {\
         "name": name,\
@@ -380,8 +396,8 @@ def deleteFlavor(ID):
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
     if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [deleteFlavor] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
+        raise AttributeError("N-Irm: [deleteFlavor] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
 
     r = requests.delete(public_url+'/flavors/'+ID, headers=headers)
     logger.info("Completed!")
@@ -392,9 +408,9 @@ def cleanFlavors():
     r = requests.get(public_url+'/flavors', headers=headers)
 
     for flavor in r.json()['flavors']:
-		if "HARNESS" in flavor['name']:
-			deleteFlavor(flavor['id'])
-			#print flavor
+        if "HARNESS" in flavor['name']:
+            deleteFlavor(flavor['id'])
+            #print flavor
 
     logger.info("Completed!")
 
@@ -408,16 +424,16 @@ def getInstanceStatus(ID):
     headers = {'X-Auth-Token': token_id}
     
     if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
+        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
     
     r = requests.get(public_url+'/servers/'+ID, headers=headers)
     
     #print r.json()['server']['id']
     try:
-    	status = r.json()['server']['status']
+        status = r.json()['server']['status']
     except TypeError:
-    	print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
+        print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
 
     if status:
          return status
@@ -469,8 +485,8 @@ def getNetworks():
     headers = {'X-Auth-Token': token_id}
 
     if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
+        raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
     
     r = requests.get(public_url+'/os-networks', headers=headers)
     #print r.json()
