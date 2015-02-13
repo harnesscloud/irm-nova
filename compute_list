@@ -15,7 +15,7 @@
          "host_name":"openstack-compute1",
          "location":"/DataCenter2/Rack2/",
          "frequency":2500,
-         "IP":"10.55.164.178",
+         "IP":"10.55.164.243",
          "Cost":{
             "Cores":0.003,
             "Memory":0.002,
@@ -26,7 +26,18 @@
          "host_name":"openstack-compute2",
          "location":"/DataCenter2/Rack2/",
          "frequency":2600,
-         "IP":"10.55.164.222",
+         "IP":"10.55.164.169",
+         "Cost":{
+            "Cores":0.005,
+            "Memory":0.006,
+            "Disk":0.003
+         }
+      },
+      {
+         "host_name":"openstack-compute3",
+         "location":"/DataCenter2/Rack2/",
+         "frequency":2600,
+         "IP":"10.55.164.168",
          "Cost":{
             "Cores":0.005,
             "Memory":0.006,

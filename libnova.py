@@ -278,12 +278,12 @@ def createListAvailableResources(host_list,public_url,token_id,option):
              # load values
              hostIP = h['IP']
              hostName = h['host_name']
-             costCores = h['Cost']['Cores']
-             costMemory = h['Cost']['Memory']
-             costDisk = h['Cost']['Disk']
+             #costCores = h['Cost']['Cores']
+             #costMemory = h['Cost']['Memory']
+             #costDisk = h['Cost']['Disk']
              frequency = h['frequency']
              location = h['location']
-             CRSID = location+hostIP+"/machine/"+hostName
+             #CRSID = location+hostIP+"/machine/"+hostName
             
                              
              #print hostName,costCores,costMemory,costDisk
@@ -316,7 +316,7 @@ def createListAvailableResources(host_list,public_url,token_id,option):
                      Memory = int(total_mem - used_mem - 0.1 * total_mem)
                      disk = total_disk - used_disk
                  # build response
-                 data = {"ID":CRSID, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":Memory,"Disk":disk},"Cost":{"Cores":costCores,"Memory":costMemory,"Disk":costDisk}}
+                 data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":Memory,"Disk":disk}}
                  resources[option].append(data)
                  #print resources
              #r = json.dumps(resources)
@@ -434,6 +434,7 @@ def getImageUUIDbyName(name):
         raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
     
+    #print name
     #print "public_url:",public_url
     r = requests.get(public_url+'/images', headers=headers)
     #print "GLANCE IMAGES",r.text

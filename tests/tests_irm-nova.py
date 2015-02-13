@@ -61,7 +61,7 @@ def apiTest(url,verb,data=None):
 
     return result
 
-apiList=["/method/getAvailableResources","/method/getResourceTypes","/method/calculateResourceCapacity","/method/reserveResources","/method/verifyResources","/method/releaseResources","/method/releaseAllResources"]
+apiList=["/getAvailableResources","/getResourceTypes","/calculateResourceCapacity","/reserveResources","/verifyResources","/releaseResources","/releaseAllResources"]
 
 
 def testAPI():
@@ -77,7 +77,7 @@ def testAPI():
                     error = "Data empty"
             elif "verifyResources" in api:
                 decoded = json.loads(response)['result']
-                response = apiTest(url,"GET",json.dumps(decoded))
+                response = apiTest(url,"POST",json.dumps(decoded))
                 if not json.loads(response)['result']['Reservations']:
                     error = "Data empty"
             elif "releaseResources" in api:
@@ -86,14 +86,14 @@ def testAPI():
                 response = apiTest(url,"DELETE",json.dumps(decoded))
             elif "releaseAllResources" in api:
                 # Need to do another reservation to test this API
-                response = apiTest(irm_nova_url+"/method/reserveResources","POST",jsonReserveRes)
+                response = apiTest(irm_nova_url+"/reserveResources","POST",jsonReserveRes)
                 decoded = json.loads(response)['result']
                 #print decoded
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
                 response = apiTest(url,"DELETE",json.dumps(decoded))
             elif "calculateResourceCapacity" in api:
-                response = apiTest(url,"GET",jsonCalcResCap)
+                response = apiTest(url,"POST",jsonCalcResCap)
 #            elif "calculateResourceAgg" in api:
 #                response = apiTest(url,"POST",jsonCalcResAgg)
             elif "get" in api:

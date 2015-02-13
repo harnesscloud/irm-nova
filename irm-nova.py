@@ -55,15 +55,14 @@ formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(file
 handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
 ## Logging format
 handler.setFormatter(formatter)
-
 logger.addHandler(handler)
 
 
 ######################################################## API ###################################################################
 
 # To be fixed with GET
-@route('/method/getAvailableResources/', method='GET')
-@route('/method/getAvailableResources', method='GET')
+@route('/getAvailableResources/', method='GET')
+@route('/getAvailableResources', method='GET')
 def getAvailableResources(): 
     logger.info("Called")
 
@@ -84,20 +83,20 @@ def getAvailableResources():
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD') 
+    response.set_header('Allow', 'GET, HEAD') 
 
     logger.info("Completed")   
     return result
     
 # To be fixed with GET
-@route('/method/getResourceTypes/', method='GET')
-@route('/method/getResourceTypes', method='GET')
+@route('/getResourceTypes/', method='GET')
+@route('/getResourceTypes', method='GET')
 def getResourceTypes():
     logger.info("Called")
     try:
         #data = createListAvailableResources(host_list,public_url,token_id)
         types = {"Types":[]}
-        data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"}}}
+        data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"},"Image":{"Description":"Image name","DataType":"string"},"UserData":{"Description":"User custom data","DataType":"string"}}}
         types["Types"].append(data)
                
         result = {"result":types}
@@ -111,7 +110,7 @@ def getResourceTypes():
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD') 
+    response.set_header('Allow', 'GET, HEAD') 
     
     if r:
         return r
@@ -121,11 +120,12 @@ def getResourceTypes():
 
 
 # To be fixed with GET
-@route('/method/verifyResources/', method='GET')
-@route('/method/verifyResources', method='GET')
+@route('/verifyResources/', method='POST')
+@route('/verifyResources', method='POST')
 def verifyResources():
     logger.info("Called")
     try:
+        #print ID
         req = json.load(request.body)
     except ValueError as e:
         print e
@@ -160,10 +160,15 @@ def verifyResources():
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'POST, HEAD') 
+
     logger.info("Completed!")
 
-@route('/method/reserveResources/', method='POST')
-@route('/method/reserveResources', method='POST')
+@route('/reserveResources/', method='POST')
+@route('/reserveResources', method='POST')
 def reserveResources():
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
@@ -184,14 +189,16 @@ def reserveResources():
         # loop through all requested resources
         name = ""
         #print "============> ", req['Resources']
+        h_list = getHosts()
+        #print h_list
 
         for resource in req['Resources']:
            #print resource
            # load values
            IP = resource['IP']
            #print "Image", resource['Image']
-           if 'Image' in resource:
-               image = getImageUUIDbyName(resource['Image'])
+           if 'Image' in resource['Attributes']:
+               image = getImageUUIDbyName(resource['Attributes']['Image'])
            else:
                if CONFIG.has_option('CRS','IMAGE_NAME'):
                    image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
@@ -199,8 +206,8 @@ def reserveResources():
                    image = CONFIG.get('CRS', 'DEFAULT_IMAGE')
            #print "Image after", image
            user_data = ''
-           if 'UserData' in resource:
-               user_data = resource['UserData']
+           if 'UserData' in resource['Attributes']:
+               user_data = resource['Attributes']['UserData']
 
            if 'Cores' in resource['Attributes']:
                vcpu = resource['Attributes']['Cores']
@@ -220,7 +227,6 @@ def reserveResources():
                frequency = 2.4
 
            hostName = ""
-           h_list = getHosts()
           
            for novah in h_list:
                #print host_list
@@ -323,7 +329,7 @@ def reserveResources():
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/method/releaseResources/<ID>', method='DELETE')
+@route('/releaseResources/<ID>', method='DELETE')
 def releaseResources(ID):
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
@@ -334,12 +340,16 @@ def releaseResources(ID):
     	logger.error("Failed to assign headers. Possible fault in token_id")
    
     r = requests.delete(public_url+'/servers/'+ID, headers=headers)
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'DELETE, HEAD') 
+
     return r
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/method/releaseResources/', method='DELETE')
-@route('/method/releaseResources', method='DELETE')
+@route('/releaseResources/', method='DELETE')
+@route('/releaseResources', method='DELETE')
 def releaseResources():
     logger.info("Called")
     try:
@@ -366,8 +376,8 @@ def releaseResources():
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/method/releaseAllResources/', method='DELETE')
-@route('/method/releaseAllResources', method='DELETE')
+@route('/releaseAllResources/', method='DELETE')
+@route('/releaseAllResources', method='DELETE')
 def releaseResources():
     logger.info("Called")
     try:
@@ -399,11 +409,15 @@ def releaseResources():
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'DELETE, HEAD') 
 
     logger.info("Completed!")
 
-@route('/method/calculateResourceCapacity/', method='GET')
-@route('/method/calculateResourceCapacity', method='GET')
+@route('/calculateResourceCapacity/', method='POST')
+@route('/calculateResourceCapacity', method='POST')
 def calculateResourceCapacity():
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
