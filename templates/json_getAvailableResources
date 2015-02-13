@@ -1,0 +1,19 @@
+{
+	"Input":"",
+	"Output":
+	        {
+	        "Resources":[
+		      {
+		         "IP":"...",
+		         "ID":"...",
+		         "Type":"Machine",
+		         "Attributes":{
+		            "Cores":0,
+		            "Frequency":0,
+		            "Memory":0,
+		            "Disk":0
+		         }
+		      }
+		   ]
+   }
+}

@@ -1,0 +1,41 @@
+
+{
+	"Input":"",
+	"Output":
+		{
+			"Type":"Machine",
+			"Attributes":
+				{
+					"Cores":
+						{
+							"Description":"Number of cores",
+							"DataType":"int"
+						},
+					"Frequency":
+						{
+							"Description":"Processor frequency",
+							"DataType":"double"
+						},
+					"Memory":
+						{
+							"Description":"Amount of RAM",
+							"DataType":"int"
+						},
+					"Disk":
+						{
+							"Description":"Disk capacity",
+							"DataType":"int"
+						},
+					"Image":
+						{
+							"Description":"Image name",
+							"DataType":"string"
+						},
+					"UserData":
+						{
+							"Description":"User custom data",
+							"DataType":"string"
+						}
+				}
+		}
+}
