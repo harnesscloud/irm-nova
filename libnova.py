@@ -348,27 +348,6 @@ def createListAvailableResources(host_list,public_url,token_id,option):
     else:
         return None
 
-def registerIRM():
-    logger.info("Called")
-#    print "ip:%s , port:%s, crs: %s" % (IP_ADDR, PORT_ADDR, CONFIG.get('CRS', 'CRS_URL'))
-    headers = {'content-type': 'application/json'}
-    try:
-       data = json.dumps(\
-       {\
-       "Manager":"IRM",\
-       "Hostname":IP_ADDR,\
-       "Port":PORT_ADDR,\
-       "Name":"IRM-NOVA"\
-       })
-    except AttributeError:
-        logger.error("Failed to json.dumps into data")
-   
-    # add here a check if that flavor name exists already and in that case return the correspondent ID
-    # without trying to create a new one as it will fail
-    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/method/addManager', data, headers=headers)
-
-    logger.info("Completed!")
-
 def createFlavor(name,vcpu,ram,disk):
     logger.info("Called")
     headers = {'content-type': 'application/json','X-Auth-Token': token_id}

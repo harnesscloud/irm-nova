@@ -589,6 +589,28 @@ def calculateResourceCapacity():
 
 ################################################################# End API #######################################################################
 
+def registerIRM():
+    logger.info("Called")
+    logger.info( "ip:%s , port:%s, crs: %s" % (IP_ADDR, PORT_ADDR, CONFIG.get('CRS', 'CRS_URL')))
+    headers = {'content-type': 'application/json'}
+    try:
+       data = json.dumps(\
+       {\
+       "Manager":"IRM",\
+       "Hostname":IP_ADDR,\
+       "Port":PORT_ADDR,\
+       "Name":"IRM-NOVA"\
+       })
+    except AttributeError:
+        logger.error("Failed to json.dumps into data")
+   
+    # add here a check if that flavor name exists already and in that case return the correspondent ID
+    # without trying to create a new one as it will fail
+    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/method/addManager', data, headers=headers)
+
+    logger.info("Completed!")
+
+
 def getifip(ifn):
     '''
 Provided network interface returns IP adress to bind on
@@ -686,6 +708,8 @@ Copyright 2012-2013 SAP Ltd
        global CONFIG
        CONFIG = ConfigParser.RawConfigParser()
        CONFIG.read(options.config)
+
+       print options.config
        
        INTERFACE = CONFIG.get('main', 'IRM_INTERFACE')
        PORT_ADDR = CONFIG.get('main', 'IRM_PORT')
