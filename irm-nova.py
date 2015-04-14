@@ -197,7 +197,7 @@ def reserveResources():
         #print h_list
 
         for resource in req['Resources']:
-           #print resource
+           print resource
            # load values
            IP = resource['IP']
            #print "Image", resource['Image']
@@ -206,9 +206,7 @@ def reserveResources():
            else:
                if CONFIG.has_option('CRS','IMAGE_NAME'):
                    image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
-               elif CONFIG.has_option('CRS','DEFAULT_IMAGE'):
-                   image = CONFIG.get('CRS', 'DEFAULT_IMAGE')
-           #print "Image after", image
+           print "Image after", image
            user_data = ''
            if 'UserData' in resource['Attributes']:
                user_data = resource['Attributes']['UserData']
@@ -267,7 +265,8 @@ def reserveResources():
                           #print "data before creating instance: ", data
                           #print "Creating instance number "+str(i+1)+", name "+name
                           print "Creating instance "+name
-                          r = requests.post(public_url+'/servers', data, headers=headers)
+                          #r = requests.post(public_url+'/servers', data, headers=headers)
+                          r = createResources(data)
                           #print "====> ", str(r.json())
                           #print r.json()
                           try:

@@ -54,6 +54,7 @@ def apiTest(url,verb,data=None):
         elif verb == "DELETE":
             r = requests.delete(url, data=data, headers=headers)
         result = r.text
+        print result
     except Exception.message, e:
        response.status = 400
        error = {"message":e,"code":response.status}
@@ -72,7 +73,7 @@ def testAPI():
         try:
             if "reserveResources" in api:
                 response = apiTest(url,"POST",jsonReserveRes)
-                #print "RESERVER TEST:",json.loads(response)['result']['Reservations']
+                print "RESERVER TEST:",json.loads(response)['result']['Reservations']
                 if not json.loads(response)['result']['Reservations']:
                     error = "Data empty"
             elif "verifyResources" in api:
