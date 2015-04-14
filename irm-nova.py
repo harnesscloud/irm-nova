@@ -197,7 +197,7 @@ def reserveResources():
         #print h_list
 
         for resource in req['Resources']:
-           print resource
+           #print resource
            # load values
            IP = resource['IP']
            #print "Image", resource['Image']
@@ -206,7 +206,7 @@ def reserveResources():
            else:
                if CONFIG.has_option('CRS','IMAGE_NAME'):
                    image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
-           print "Image after", image
+           #print "Image after", image
            user_data = ''
            if 'UserData' in resource['Attributes']:
                user_data = resource['Attributes']['UserData']
