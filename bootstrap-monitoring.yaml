@@ -1,0 +1,9 @@
+---
+- hosts: monitorednodes
+  #vars:
+  #  http_port: 80
+  #  max_clients: 200
+  #remote_user: 
+  tasks:
+  - name: starting remote supervisor
+    command: supervisord
