@@ -431,8 +431,7 @@ def calculateResourceCapacity():
         try:
            req = json.load(request.body)
         except ValueError:
-           print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout"
-           print ""
+           print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
         cores = 0
@@ -675,7 +674,7 @@ def default():
 def main():
     usage = "Usage: %prog [option] arg"
     #paragraph of help text to print after option help
-    epilog= "Copyright 2014 SAP Ltd"
+    epilog= "Copyright 2015 SAP Ltd"
     #A paragraph of text giving a brief overview of your program
     description="""IRM is small api that enables the Cross Resource Scheduler (CRS) to talk to the nova API"""
     parser = optparse.OptionParser(usage=usage,epilog=epilog,description=description)
@@ -694,10 +693,10 @@ def main():
     #print options, args
     if options.version:
         #noExtraOptions(options, "version")
-        VERSION = "0.1"
+        VERSION = "0.2"
         #os.system("clear")
         text = '''
-Copyright 2012-2013 SAP Ltd
+Copyright 2014-2015 SAP Ltd
 '''
         print VERSION
         sys.exit(1)
