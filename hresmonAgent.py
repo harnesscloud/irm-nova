@@ -39,7 +39,9 @@ logger.addHandler(handler)
 # this will be moved in the agent code
 def createResourceValuesStore(uuid):
     db = sqlite3.connect("hresmon.sqlite")
-    db.execute('''CREATE TABLE IF NOT EXISTS \"resourceValuesStore_'''+uuid+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
+    cur = db.cursor()
+    tbname = "resourceValuesStore_"+uuid
+    cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
     db.commit()
     db.close
 
@@ -47,8 +49,9 @@ def createResourceValuesStore(uuid):
 def updateResourceValuesStore(uuid,cpu,mem,timestamp):
     #print "In updateResourceValuesStore"
     db = sqlite3.connect("hresmon.sqlite")
+    cur = db.cursor()
     tbname = "resourceValuesStore_"+uuid
-    db.execute('''INSERT INTO \"'''+tbname+'''\"(CPU,MEM,TIMESTAMP) VALUES (?,?,?)''',[cpu,mem,timestamp])
+    cur.execute('''INSERT INTO \"'''+tbname+'''\"(CPU,MEM,TIMESTAMP) VALUES (?,?,?)''',[cpu,mem,timestamp])
     db.commit()
     db.close
 
@@ -60,7 +63,6 @@ def deleteResourceValuesStore():
 @route('/createAgent/', method='POST')
 @route('/createAgent', method='POST')
 def createAgent():
-    logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
@@ -75,32 +77,50 @@ def createAgent():
 
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
-        if getProcessByName(uuid):
-            action = "Agent already existing"
+        
+        # check if the pid exists
+        pid = getPid(uuid) 
+        if pid == "":
+            msg = "No process existing for Agent "+uuid
+            logger.error("No pid exists for process "+uuid)
+            response.status = 404
+            error = {"message":msg,"code":response.status}
+            return error
+        elif pid == "multiple":
+            msg = "Multiple processes existing for Agent "+uuid
+            logger.error("multiple pid exists for process "+uuid)
+            response.status = 409
+            error = {"message":msg,"code":response.status}
+            return error
         else:
-            print "CreateAgent request", uuid,pollTime
-            t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid))
-            t.daemon = True
-            t.start()
-            action = "Agent created"
+            # check if there is already an agent created
+            if getProcessByName(uuid):
+                msg = "Agent already existing "+uuid
+                logger.error("Agent already exisits for process "+uuid)
+                response.status = 409
+                error = {"message":msg,"code":response.status}
+                return error
+            else:
+                print "CreateAgent request", uuid,pollTime
+                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid))
+                t.daemon = True
+                t.start()
+                msg = "Agent created"
 
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)   
-    logger.info("Completed!")
-    
-    result = {"Agent":uuid,"Action":action}
-
+       
+    result = {"Agent":uuid,"Message":msg}
+    logger.info(result)
     jsondata = json.dumps(result)
-
     return jsondata
 
-@route('/destroyAgent/', method='DELETE')
-@route('/destroyAgent', method='DELETE')
-def destroyAgent():
-    logger.info("Called")
+@route('/terminateAgent/', method='DELETE')
+@route('/terminateAgent', method='DELETE')
+def terminateAgent():
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
@@ -113,24 +133,30 @@ def destroyAgent():
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
         uuid = req['uuid']
-        print "Destroy Agent request", uuid
+        print "Terminate Agent request", uuid
         t = getProcessByName(uuid)
-        t.terminate()
+        if t == None:
+            msg = "No Agent found "+uuid
+            logger.error("No Agent found "+uuid)
+            response.status = 404
+            error = {"message":msg,"code":response.status}
+            return error
+        else:
+            t.terminate()
+            msg = "Terminated"
 
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
-        logger.error(error)   
-    logger.info("Completed!")
+        logger.error(error)
     
-    result = {"Agent":uuid,"Action":"Destroyed"}
-
+    result = {"Agent":uuid,"Message":msg}
+    logger.info(result)
     jsondata = json.dumps(result)
     return jsondata
 
 def getProcessByName(uuid):
-    logger.info("Called")
     try:
         myprocesses = multiprocessing.active_children()
 
@@ -139,6 +165,14 @@ def getProcessByName(uuid):
                 return p
     except Exception.message, e:
         return e
+
+def getPid(uuid):
+    pidCmd = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
+    pid = subprocess.check_output(pidCmd, shell=True).rstrip()
+    if "\n" in pid:
+        #pid = pid.replace('\n',' ')
+        pid = "multiple"
+    return pid
 
 def destroyAllAgents():
     print "In destroyAllAgents"
@@ -149,9 +183,10 @@ def getResourceValueStoreStats():
 def runAgent(pollTime,uuid):
     createResourceValuesStore(uuid)
     p = multiprocessing.current_process()
-    getPid = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
-    pid = subprocess.check_output(getPid, shell=True).rstrip()
-    print 'Starting', p.name, "to monitor",pid
+    pid = getPid(uuid)
+    msg = 'Starting '+p.name+ " to monitor "+pid
+    print msg
+    logger.info(msg)
     sys.stdout.flush()
     nproc = subprocess.check_output("nproc", shell=True).rstrip()
 
@@ -177,10 +212,13 @@ def startAPI(IP_ADDR,PORT_ADDR):
     proccount = subprocess.check_output(command,shell=True).count('\n')
     proc = subprocess.check_output(command,shell=True)
     if proccount > 1:
-        print "---Check if hresmonAgent is already running. Connection error---"
+        msg = "---Check if hresmonAgent is already running. Connection error---"
+        print msg
+        logger.info(msg)
         sys.exit(0)
     else:
-        print"hresmonAgent API IP address:",IP_ADDR
+        msg = "hresmonAgent API IP address: "+IP_ADDR
+        logger.info(msg)
         API_HOST=run(host=IP_ADDR, port=PORT_ADDR)
     return IP_ADDR
 
