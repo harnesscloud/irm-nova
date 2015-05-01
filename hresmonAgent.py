@@ -37,23 +37,52 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 # this will be moved in the agent code
-def createResourceValuesStore(uuid):
+def createResourceValuesStore(uuid,metrics):
+    query = buildSqlCreate(metrics,uuid)
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
     tbname = "resourceValuesStore_"+uuid
-    cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
+    #cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
+    cur.execute(query)
     db.commit()
     db.close
 
 # this will be moved in the agent code
-def updateResourceValuesStore(uuid,cpu,mem,timestamp):
+def updateResourceValuesStore(uuid,values):
     #print "In updateResourceValuesStore"
+    #values = [cpu,mem,timestamp]
+    query = buildSqlInsert(len(values),uuid)
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
     tbname = "resourceValuesStore_"+uuid
-    cur.execute('''INSERT INTO \"'''+tbname+'''\"(CPU,MEM,TIMESTAMP) VALUES (?,?,?)''',[cpu,mem,timestamp])
+    #cur.execute('''INSERT INTO \"'''+tbname+'''\" VALUES (?,?,?)''',[cpu,mem,timestamp])
+    cur.execute(query,values)
     db.commit()
     db.close
+
+def buildSqlCreate(metrics,uuid):
+    tbname = "resourceValuesStore_"+uuid
+    columns = ""
+    for m in metrics:
+        columns = columns+"\""+m[0]+"\" "+m[1]+","
+
+    columns = columns[:-1]
+
+    query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
+    return query
+
+def buildSqlInsert(nvalues,uuid):
+    tbname = "resourceValuesStore_"+uuid
+    columns = ""
+    for i in range(0,nvalues):
+        columns = columns+"?,"
+
+    columns = columns[:-1]
+
+    query = "INSERT INTO \""+tbname+"\" VALUES ("+columns+")"
+    #print query
+
+    return query
 
 # this will be moved in the agent code
 def deleteResourceValuesStore():
@@ -71,13 +100,19 @@ def createAgent():
         # get the body request
         try:
            req = json.load(request.body)
-        except ValueError:
+           print req
+        except Exception.message, e:
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
+           return error
 
+        metrics = req['metrics']
+        command = req['command']
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
         
+        #print "metrics, command, uuid, pollTime",metrics,command,uuid,pollTime
+
         # check if the pid exists
         pid = getPid(uuid) 
         if pid == "":
@@ -102,7 +137,7 @@ def createAgent():
                 return error
             else:
                 print "CreateAgent request", uuid,pollTime
-                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid))
+                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid,metrics,command))
                 t.daemon = True
                 t.start()
                 msg = "Agent created"
@@ -180,8 +215,8 @@ def destroyAllAgents():
 def getResourceValueStoreStats():
     print "In getResourceValueStoreStats"
     
-def runAgent(pollTime,uuid):
-    createResourceValuesStore(uuid)
+def runAgent(pollTime,uuid,metrics,command):
+    createResourceValuesStore(uuid,metrics)
     p = multiprocessing.current_process()
     pid = getPid(uuid)
     msg = 'Starting '+p.name+ " to monitor "+pid
@@ -189,13 +224,28 @@ def runAgent(pollTime,uuid):
     logger.info(msg)
     sys.stdout.flush()
     nproc = subprocess.check_output("nproc", shell=True).rstrip()
+    command = command.replace("__pid__",pid)
+    #print "New command", command
 
     while True:
-        getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
-        values = subprocess.check_output(getValues, shell=True).rstrip()
+        #getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
+        values = subprocess.check_output(command, shell=True).rstrip()
         values_decoded = values.decode('utf-8')
-        [cpu, mem, timestamp] = values_decoded.split(' ', len(values_decoded))
-        updateResourceValuesStore(uuid,float(cpu)/float(nproc),float(mem),float(timestamp))
+        #print "values_decoded", values_decoded
+        # This convert multiline to singleline
+        values_decoded = values_decoded.replace("\n"," ")
+
+        #print "length values_decoded",len(values_decoded.split(' ', len(values_decoded)))
+        #nmetrics = len(values_decoded.split(' ', len(values_decoded)))
+        #print nmetrics
+        #for i in range(0,nmetrics):
+        #    print metrics[i][0]
+
+        #print "metrics",metrics
+        values = values_decoded.split(' ', len(values_decoded))
+        print "values", values
+
+        updateResourceValuesStore(uuid,values)
         time.sleep(pollTime)
     
 def getifip(ifn):
