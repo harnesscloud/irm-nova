@@ -1,5 +1,5 @@
 ---
-- hosts: monitorednodes
+- hosts: harness
   #vars:
   #  http_port: 80
   #  max_clients: 200

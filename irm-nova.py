@@ -38,7 +38,7 @@
 #
 #
 
-import requests, json, pickle, sys, os, subprocess,optparse, time, thread
+import requests, json, pickle, sys, os, subprocess,optparse, time, thread, hresmon
 import re
 from bottle import route, run,response,request,re
 import ConfigParser
@@ -267,10 +267,12 @@ def reserveResources():
                           print "Creating instance "+name
                           #r = requests.post(public_url+'/servers', data, headers=headers)
                           r = createResources(data)
+                          
                           #print "====> ", str(r.json())
                           #print r.json()
                           try:
                             ID = r.json()['server']['id']
+                            createMonitorInstance(ID,IP,hostName)
                             #print r.json()
                           except KeyError, msg:
                             print r.json()
@@ -362,7 +364,7 @@ def releaseResources():
     	print " "
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        
+        destroyMonitoringInstance(reservations)
         reply = deleteResources(reservations)
         if "DONE" in reply:
             return { "result": { } }
@@ -391,7 +393,7 @@ def releaseResources():
         print " "
         logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        
+        destroyMonitoringInstance(reservations)
         reply = deleteResources(reservations)
         #reply = {"DONE"}
         if "DONE" in reply:
@@ -587,9 +589,39 @@ def calculateResourceCapacity():
 
 ################################################################# End API #######################################################################
 
-def monitorInstance(uuid):
+def createMonitorInstance(uuid,IP,host):
     logger.info("Called")
     print "In monitorInstance"
+    itype = getInstanceType(host)
+    print host,itype
+
+    template = ""
+
+    if itype == "QEMU":
+        template = "testJsonAgentRequestVM"
+    elif itype == "docker":
+        template = "testJsonAgentRequestContainer"
+
+    if template != "":
+        with open (template, "r") as myfile:
+            data=myfile.read()
+
+        # update uuid in template with current value
+        r = json.loads(data)
+        r["uuid"] = uuid
+        data = json.dumps(r)
+        hresmon.addResourceStatus(uuid,IP,data,"NEW")
+    else:
+        print "No hypervisor type found"
+
+def destroyMonitoringInstance(reservations):
+    logger.info("Called")
+    print "In destroyMonitoringInstance"
+    print "reservations",reservations
+    for ID in reservations['Reservations']:
+        print "uuid",ID
+        r = hresmon.destroyAgent(ID)
+    #print r
 
 
 def registerIRM():

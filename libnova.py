@@ -569,5 +569,26 @@ def createResources(data):
     logger.info("Completed!")
     return r
 
-def getInstanceType(uuid):
-    print uuid
+def getInstanceType(host):
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+    
+    r = requests.get(public_url+'/os-hypervisors/detail', headers=headers)
+    #print r.json()
+    htype = ""
+    result = r.json()
+    for h in result['hypervisors']:
+        if h['service']['host'] == host:
+            htype = h['hypervisor_type']
+            break
+
+    return htype
+    #if len(networks) > 0:
+    #        return networks
+    #else:
+    #        return None
+    logger.info("Completed!")

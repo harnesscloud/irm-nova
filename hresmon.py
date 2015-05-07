@@ -23,6 +23,16 @@ from libnova import *
 import hresmonAgent
 from daemon import *
 
+global myname, myprocesses
+myname = os.path.basename(__file__)
+
+ogger = logging.getLogger("Rotating Log")
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",when="H",interval=24,backupCount=0)
+## Logging format
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 # This function is exposed to the IRM-NOVA which adds entry whenever a VM needs to be monitored. Essentially is creating a new request to hresmon
 def addResourceStatus(uuid,host,request,status):
@@ -46,23 +56,51 @@ def deleteResourceStatus():
 # this function creates an agent python file to a local or remote host and starts the agent
 def createAgent(data,url):
     print "In createAgent"
-    #logger.info("Called")
+    logger.info("Called")
     headers = {'content-type': 'application/json'}
     try:
         r = requests.post('http://'+url+':12000/createAgent', data, headers=headers)
-        print r
+        logger.info("response:"+json.dumps(r.json()))
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
-        #logger.error(error)
-    #logger.info("Completed!")
+        logger.error(error)
+    logger.info("Completed!")
     return r
 
-def destroyAgent():
+def destroyAgent(uuid):
+    logger.info("Called")
     print "In destroyAgent"
-    time.sleep(20)
-    hresmonAgent.stop()
+    headers = {'content-type': 'application/json'}
+    try:
+        url = getIPbyUuid(uuid)
+        data = {"uuid":uuid}
+        jsondata = json.dumps(data)
+        print jsondata
+        r = requests.delete('http://'+url+':12000/terminateAgent', data=jsondata, headers=headers)
+        updateResourceStatus (uuid,"ENDED")
+        logger.info("response:"+json.dumps(r.json()))
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+    logger.info("Completed!")
+    return r
+
+def getIPbyUuid(uuid):
+    logger.info("Called")
+    print "In getIPbyUuid"
+    ip = ""
+    db = sqlite3.connect("hresmon.sqlite")
+    cur = db.cursor()
+    query = "SELECT HOST FROM resources WHERE uuid = \'"+uuid+"\'"
+    cur.execute(query)
+    [ip] = cur.fetchone()
+    print ip
+    logger.info("Completed!")
+    return ip
 
 def destroyAllAgents():
     print "In destroyAllAgents"
@@ -85,8 +123,11 @@ def checkNewRequests():
         all_rows = cursor.fetchall()
         for row in all_rows:
             print row[0],row[3]
-            createAgent(row[2],row[1])
-            updateResourceStatus(row[0],"RUNNING")
+            r = createAgent(row[2],row[1])
+            res = r.json()
+            print res
+            if 'code' not in res:
+                updateResourceStatus(row[0],"RUNNING")
         time.sleep(10)
 
     db.close
@@ -111,15 +152,15 @@ def start():
         sys.exit(0)
     else:
         print"hresmon started"
-        with open ("testJsonAgentRequest", "r") as myfile:
-            data=myfile.read()
+        #with open ("testJsonAgentRequest", "r") as myfile:
+        #    data=myfile.read()
         
-        addResourceStatus(createRandomID(10),"10.55.164.160", data, "NEW")
+        #addResourceStatus(createRandomID(10),"10.55.164.160", data, "NEW")
         
         t = multiprocessing.Process(name="monMaster",target=checkNewRequests,args=())
         t.daemon = True
         t.start()
-        msg = "Agent created"
+        msg = "hresmon started"
         print msg
         while True:
             pass
