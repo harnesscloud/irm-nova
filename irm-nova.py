@@ -273,8 +273,8 @@ def reserveResources():
                             ID = r.json()['server']['id']
                             #print r.json()
                           except KeyError, msg:
-                            print "N-Irm: [reserveResources] Error within payload, please check spelling"
-                            logger.error("KeyError in payload, please check spelling of attributes")
+                            print r.json()
+                            logger.error(r.json())
                           #print getInstanceInfo(ID)
                           #print ID
                           #status = ""
@@ -586,6 +586,11 @@ def calculateResourceCapacity():
 #     logger.info("Completed!")
 
 ################################################################# End API #######################################################################
+
+def monitorInstance(uuid):
+    logger.info("Called")
+    print "In monitorInstance"
+
 
 def registerIRM():
     logger.info("Called")

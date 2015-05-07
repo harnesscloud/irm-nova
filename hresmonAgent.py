@@ -46,6 +46,7 @@ def createResourceValuesStore(uuid,metrics):
     cur.execute(query)
     db.commit()
     db.close
+    logger.info("Created table "+tbname)
 
 # this will be moved in the agent code
 def updateResourceValuesStore(uuid,values):
@@ -59,12 +60,13 @@ def updateResourceValuesStore(uuid,values):
     cur.execute(query,values)
     db.commit()
     db.close
+    logger.info("Updating table "+tbname)
 
 def buildSqlCreate(metrics,uuid):
     tbname = "resourceValuesStore_"+uuid
     columns = ""
     for m in metrics:
-        columns = columns+"\""+m[0]+"\" "+m[1]+","
+        columns = columns+"\""+m['name']+"\" "+m['type']+","
 
     columns = columns[:-1]
 
@@ -84,6 +86,13 @@ def buildSqlInsert(nvalues,uuid):
 
     return query
 
+def buildCommand(metrics):
+    command = ""
+    for m in metrics:
+        command = command+m['command']+";"
+
+    return command
+
 # this will be moved in the agent code
 def deleteResourceValuesStore():
     print "In deleteResourceValuesStore"
@@ -100,21 +109,27 @@ def createAgent():
         # get the body request
         try:
            req = json.load(request.body)
-           print req
+           #print req
         except Exception.message, e:
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
            return error
 
         metrics = req['metrics']
-        command = req['command']
+        #command = req['command']
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
+        instanceType = req['instanceType']
         
         #print "metrics, command, uuid, pollTime",metrics,command,uuid,pollTime
 
         # check if the pid exists
-        pid = getPid(uuid) 
+        if instanceType == "container":
+            pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
+        elif instanceType == "vm":
+            pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
+        
+        pid = getPid(uuid,pidCmd) 
         if pid == "":
             msg = "No process existing for Agent "+uuid
             logger.error("No pid exists for process "+uuid)
@@ -136,8 +151,11 @@ def createAgent():
                 error = {"message":msg,"code":response.status}
                 return error
             else:
-                print "CreateAgent request", uuid,pollTime
-                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid,metrics,command))
+                logger.info("CreateAgent request "+uuid+" "+str(pollTime))
+                #if container == True:
+                #    t = multiprocessing.Process(name=uuid,target=runAgentC, args=(pollTime,uuid,metrics))
+                #else:
+                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid,metrics,pid))
                 t.daemon = True
                 t.start()
                 msg = "Agent created"
@@ -177,6 +195,7 @@ def terminateAgent():
             error = {"message":msg,"code":response.status}
             return error
         else:
+            logger.info("Terminate request "+uuid)
             t.terminate()
             msg = "Terminated"
 
@@ -201,9 +220,8 @@ def getProcessByName(uuid):
     except Exception.message, e:
         return e
 
-def getPid(uuid):
-    pidCmd = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
-    pid = subprocess.check_output(pidCmd, shell=True).rstrip()
+def getPid(uuid,cmd):
+    pid = subprocess.check_output(cmd, shell=True).rstrip()
     if "\n" in pid:
         #pid = pid.replace('\n',' ')
         pid = "multiple"
@@ -215,17 +233,21 @@ def destroyAllAgents():
 def getResourceValueStoreStats():
     print "In getResourceValueStoreStats"
     
-def runAgent(pollTime,uuid,metrics,command):
+def runAgent(pollTime,uuid,metrics,pid):
     createResourceValuesStore(uuid,metrics)
     p = multiprocessing.current_process()
-    pid = getPid(uuid)
+    #pidCmd = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
+    #pid = getPid(uuid,pidCmd)
     msg = 'Starting '+p.name+ " to monitor "+pid
     print msg
     logger.info(msg)
     sys.stdout.flush()
     nproc = subprocess.check_output("nproc", shell=True).rstrip()
-    command = command.replace("__pid__",pid)
-    #print "New command", command
+    command = buildCommand(metrics)
+    if "__pid__" in command:
+        command = command.replace("__pid__",pid)
+    
+    print "New command", command
 
     while True:
         #getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
@@ -243,10 +265,87 @@ def runAgent(pollTime,uuid,metrics,command):
 
         #print "metrics",metrics
         values = values_decoded.split(' ', len(values_decoded))
-        print "values", values
+        #print "values", values
 
         updateResourceValuesStore(uuid,values)
         time.sleep(pollTime)
+
+def runAgentC(pollTime,uuid,metrics):
+    #createResourceValuesStore(uuid,metrics)
+    p = multiprocessing.current_process()
+    pidCmd = "sudo docker ps | grep "+uuid+" | awk '{ print $1 }'"
+    pid = getPid(uuid,pidCmd)
+    msg = 'Starting '+p.name+ " to monitor "+pid
+    print msg
+    logger.info(msg)
+    sys.stdout.flush()
+    nproc = subprocess.check_output("nproc", shell=True).rstrip()
+    command = buildCommand(metrics)
+    if "__pid__" in command:
+        command = command.replace("__pid__",pid)
+    
+    print "New command", command
+    
+    cmd_timestamp = "date +%s"
+    cmd_cpu_tot_time = "cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
+    cmd_cpu_u_s_time = "cat /sys/fs/cgroup/cpuacct/docker/d7dd648037543d83d48570ed10d4cc25deebc3a89a24ba30bed94c3ae2bc17e3/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
+    cmd_mem_tot_byte = "cat /sys/fs/cgroup/memory/docker/d7dd648037543d83d48570ed10d4cc25deebc3a89a24ba30bed94c3ae2bc17e3/memory.limit_in_bytes"
+    cmd_mem_u_s_byte = "cat /sys/fs/cgroup/memory/docker/d7dd648037543d83d48570ed10d4cc25deebc3a89a24ba30bed94c3ae2bc17e3/memory.usage_in_bytes"
+
+    
+    tot_time_cmd = "cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM, strftime(\"%s\") }'"
+    u_s_time_cmd = "cat /sys/fs/cgroup/cpuacct/docker/d7dd648037543d83d48570ed10d4cc25deebc3a89a24ba30bed94c3ae2bc17e3/cpuacct.stat | awk '{SUM+=$2} END { print SUM, strftime(\"%s\") }'"
+
+    #print "New command", command
+    tot_time_before = subprocess.check_output(tot_time_cmd, shell=True).rstrip()
+    u_s_time_before = subprocess.check_output(u_s_time_cmd, shell=True).rstrip()
+
+    tot_time_before_decoded = tot_time_before.decode('utf-8')
+    u_s_time_before_decoded = u_s_time_before.decode('utf-8')
+
+    tot_time_before_decoded_s = tot_time_before_decoded.split(' ', len(tot_time_before_decoded))
+    u_s_time_before_decoded_s = u_s_time_before_decoded.split(' ', len(u_s_time_before_decoded))
+
+    print "tot_time_before_decoded, u_s_time_before_decoded", tot_time_before_decoded, u_s_time_before_decoded
+
+    while True:
+        time.sleep(pollTime)
+        #getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
+        #values = subprocess.check_output(command, shell=True).rstrip()
+        tot_time_after = subprocess.check_output(tot_time_cmd, shell=True).rstrip()
+        u_s_time_after = subprocess.check_output(u_s_time_cmd, shell=True).rstrip()
+
+        tot_time_after_decoded = tot_time_after.decode('utf-8')
+        u_s_time_after_decoded = u_s_time_after.decode('utf-8')
+
+        tot_time_after_decoded_s = tot_time_after_decoded.split(' ', len(tot_time_after_decoded))
+        u_s_time_after_decoded_s = u_s_time_after_decoded.split(' ', len(u_s_time_after_decoded))
+
+        print "tot_time_after_decoded, u_s_time_after_decoded", tot_time_after_decoded_s[0], u_s_time_after_decoded_s[1]
+
+        u_s_util = 100 * (float(u_s_time_after_decoded_s[0]) - float(u_s_time_before_decoded_s[0]))/(float(tot_time_after_decoded_s[0]) - float(tot_time_before_decoded_s[0]))
+        print "u_s_util",u_s_util
+
+        tot_time_before_decoded_s = tot_time_after_decoded_s
+        u_s_time_before_decoded_s = u_s_time_after_decoded_s
+        #values_decoded = values.decode('utf-8')
+        #print "values_decoded", values_decoded
+        # This convert multiline to singleline
+        #values_decoded = values_decoded.replace("\n"," ")
+
+        #print "length values_decoded",len(values_decoded.split(' ', len(values_decoded)))
+        #nmetrics = len(values_decoded.split(' ', len(values_decoded)))
+        #print nmetrics
+        #for i in range(0,nmetrics):
+        #    print metrics[i][0]
+
+        #print "metrics",metrics
+        #values = values_decoded.split(' ', len(values_decoded))
+        #print "values", values
+
+        #updateResourceValuesStore(uuid,values)
+        #time.sleep(pollTime)
+
     
 def getifip(ifn):
     '''

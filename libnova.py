@@ -54,68 +54,68 @@ def getIP(url):
     logger.info("Completed!")
 
 def createToken(os_api_url, tenantName, username, password):
-     logger.info("Called")
-     headers = {'content-type': 'application/json'}
-     data = json.dumps({"auth": {"tenantName": tenantName, "passwordCredentials": {"username": username, "password": password}}})
-     token_url = os_api_url+"/v2.0/tokens"
-     #print "token_url: "+token_url
-     r = requests.post(token_url, data, headers=headers)
-     try:
+    logger.info("Called")
+    headers = {'content-type': 'application/json'}
+    data = json.dumps({"auth": {"tenantName": tenantName, "passwordCredentials": {"username": username, "password": password}}})
+    token_url = os_api_url+"/v2.0/tokens"
+    #print "token_url: "+token_url
+    r = requests.post(token_url, data, headers=headers)
+    try:
         global token_id
         token_id = r.json()['access']['token']['id']
         #print r.text
-     except AttributeError:
+    except AttributeError:
         print "N-Irm: [createToken] Unable to use r variable with json. Fault with token_url, or data variables"
         logger.error("Fault with token_url or data variable, caused r to be unusable with json")
      
-     if token_id:
+    if token_id:
             #print token_id
             return token_id
-     else:
+    else:
             return None
-     logger.info("Completed!")
+    logger.info("Completed!")
 
 def getEndPoint(os_api_url, token_id):
-     logger.info("Called")
-     endpoints_url = os_api_url+"/v2.0/tokens/"+token_id+"/endpoints"
-     headers = {'X-Auth-Token': token_id}
+    logger.info("Called")
+    endpoints_url = os_api_url+"/v2.0/tokens/"+token_id+"/endpoints"
+    headers = {'X-Auth-Token': token_id}
 
-     if str(token_id) not in str(headers):
-       raise AttributeError("N-Irm: [getEndPoint] Failure to assign headers. Possibly incorrect token_id")
-       logger.error("Failed to assign headers. Possible fault in token_id")
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getEndPoint] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
 
-     r = requests.get(endpoints_url, headers=headers)
-     try:
-       endpoints = r.json()['endpoints']
-     except AttributeError:
-       print "N-Irm [getEndPoint] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
-       logger.error("Failed to assign endpoints. Possible incorrect endpoints_url or unable to access endpoints")
+    r = requests.get(endpoints_url, headers=headers)
+    try:
+        endpoints = r.json()['endpoints']
+    except AttributeError:
+        print "N-Irm [getEndPoint] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
+        logger.error("Failed to assign endpoints. Possible incorrect endpoints_url or unable to access endpoints")
     # print endpoints
-     for majorkey in endpoints:
-         if majorkey['type'] == 'compute':
+    for majorkey in endpoints:
+        if majorkey['type'] == 'compute':
             global public_url
             public_url = majorkey['publicURL']
-     if public_url:
+    if public_url:
             #print public_url
             return public_url
-     else:
+    else:
             return None
-     logger.info("Completed!")
+    logger.info("Completed!")
 
 
 # get hosts from nova and return a list
 def getHosts():
-     logger.info("Called")
+    logger.info("Called")
     ## regex check that public url begins with http:// 
     ## token id check that it is of the correct length [32]
     ## general try except in the event of an unexpected error, recommending that 
     ## they check the public url, as named urls may not have been resolved
 
-     headers = {'X-Auth-Token': token_id}
+    headers = {'X-Auth-Token': token_id}
      #headers = None
      #print public_url
      #print token_id
-     r = requests.get(public_url+'/os-hosts', headers=headers)
+    r = requests.get(public_url+'/os-hosts', headers=headers)
      
      #print r.text
     # print headers
@@ -124,27 +124,27 @@ def getHosts():
     # print "token id"
     # print token_id
    
-     if str(token_id) not in str(headers):
-       raise AttributeError("N-Irm: [getHosts] Failure to assign headers. Possibly incorrect token_id")
-       logger.error("Failed to assign headers. Possible fault in token_id")
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getHosts] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
      
-     try:
+    try:
         # this needs to be fixed with a more appropriate error check
         if r.json():
             print "Request OK" 
-     except ValueError:
+    except ValueError:
         print "N-Irm: [getHosts] r = requests.get failed. Possible error with public_url or hostname"
         logger.error("Error within public_url or hostname. ")
 
-     hosts = []
-     for majorkey in r.json()['hosts']:
-          if majorkey['service'] == 'compute':
-              hosts.append(majorkey['host_name'])
-     if hosts:
+    hosts = []
+    for majorkey in r.json()['hosts']:
+            if majorkey['service'] == 'compute':
+                hosts.append(majorkey['host_name'])
+    if hosts:
             return hosts
-     else:
+    else:
             return None
-     logger.info("Completed!")
+    logger.info("Completed!")
 
 def getListInstances():
     logger.info("Called")
@@ -198,9 +198,9 @@ def getInstanceInfo(ID):
     #print r.json()['server']['id']
     #status = r.json()['server']['status']
     if r:
-         return r.json()
+            return r.json()
     else:
-         return None
+            return None
     logger.info("Completed!")
 
 #@route('/method/verifyResources/<ID>', method='GET')
@@ -229,18 +229,18 @@ def getInstanceInfo(ID):
 def loadHostList():
      logger.info("Called")
      with open('compute_list') as f:
-          try:
-             hosts = json.load(f)
-          except AttributeError:
-             print "N-Irm [loadHostList] Failed to load variable f into hosts"
-             logger.error("Attempt to load variable f into hosts failed")
+            try:
+                hosts = json.load(f)
+            except AttributeError:
+                print "N-Irm [loadHostList] Failed to load variable f into hosts"
+                logger.error("Attempt to load variable f into hosts failed")
 
-          f.close()
+            f.close()
 
      if hosts:
-          return hosts
+            return hosts
      else:
-          return None
+            return None
      logger.info("Completed!")
 
 
@@ -415,9 +415,9 @@ def getInstanceStatus(ID):
         print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
 
     if status:
-         return status
+            return status
     else:
-         return None
+            return None
          
     logger.info("Completed!")
 
@@ -471,12 +471,12 @@ def getNetworks():
     #print r.json()
     networks = []
     for net in r.json()['networks']:
-         networks.append(net['label'])
+            networks.append(net['label'])
 
     if len(networks) > 0:
-         return networks
+            return networks
     else:
-         return None
+            return None
     logger.info("Completed!")
 
 def checkResources(data):
@@ -568,3 +568,6 @@ def createResources(data):
         logger.error(error)
     logger.info("Completed!")
     return r
+
+def getInstanceType(uuid):
+    print uuid
