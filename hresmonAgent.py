@@ -230,8 +230,82 @@ def getPid(uuid,cmd):
 def destroyAllAgents():
     print "In destroyAllAgents"
 
-def getResourceValueStoreStats():
-    print "In getResourceValueStoreStats"
+@route('/getResourceValueStore/', method='POST')
+@route('/getResourceValueStore', method='POST')
+def getResourceValueStore():
+    logger.info("Called")
+    print "In getResourceValueStore"
+
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'POST, HEAD')
+
+    try:
+        try:
+           req = json.load(request.body)
+        except ValueError:
+           print "Attempting to load a non-existent payload, please enter desired layout\n"
+           logger.error("Payload was empty or incorrect. A payload must be present and correct")
+
+        uuid = req['uuid']
+        rformat = req['format']
+        print "getResourceValueStore request", uuid
+
+        tbname = "resourceValuesStore_"+uuid
+        
+        
+        db = sqlite3.connect("hresmon.sqlite")
+        cur = db.cursor()
+
+        cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
+
+        # collect names in a list
+        #names = [tup[1] for tup in cur.fetchall()]
+        #print(names)
+        tbheader = ""
+        for tup in cur.fetchall():
+            tbheader = tbheader + tup[1] +" "
+        
+        if rformat == "file":
+            location = "/tmp/"
+            tbfile = open(location+tbname, "wb")
+            tbfile.write(tbheader+"\n")
+
+        if rformat == "data":
+            tbs = tbheader+"\n"
+
+        cur.execute('select * from \"'+tbname+'\"')
+        tb = cur.fetchall()
+        for row in tb:
+            #print row
+            values = ""
+            for v in range(0,len(row)):
+                values = values+'{} '.format(row[v])
+            #print values
+            #values = values + "\n"
+            if rformat == "file":
+                tbfile.write(values+ "\n")
+            if rformat == "data":
+                tbs = tbs + values+ "\n"
+
+        if rformat == "file":
+            tbfile.close()
+        
+        db.close()
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+
+    if rformat == "file":
+        result = {"Table exported":location+tbname}
+    if rformat == "data":
+        result = {"Table exported":tbs}
+    logger.info(result)
+    jsondata = json.dumps(result)
+    return jsondata
+
     
 def runAgent(pollTime,uuid,metrics,pid):
     createResourceValuesStore(uuid,metrics)

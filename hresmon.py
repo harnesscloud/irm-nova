@@ -105,8 +105,24 @@ def getIPbyUuid(uuid):
 def destroyAllAgents():
     print "In destroyAllAgents"
 
-def getResourceValueStoreStats():
-    print "In getResourceValueStoreStats"
+def getResourceValueStore(req):
+    print "In getResourceValueStore"
+    logger.info("Called")
+    headers = {'content-type': 'application/json'}
+    try:
+        uuid = req['uuid']
+        url = getIPbyUuid(uuid)
+        jsondata = json.dumps(req)
+        r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
+        updateResourceStatus (uuid,"REPORTED")
+        logger.info("response:"+json.dumps(r.json()))
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+    logger.info("Completed!")
+    return r
 
 def createStatsListener():
     print "In createStatsListener"

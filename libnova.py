@@ -275,7 +275,8 @@ def createListAvailableResources(host_list,public_url,token_id,option):
     logger.info("Called")
     resources = {option:[]}   
     h_list = getHosts()
-     
+    print h_list
+    print host_list
     # loop through all hosts
     for novah in h_list:
         for h in host_list['Machine']:
@@ -330,11 +331,12 @@ def createListAvailableResources(host_list,public_url,token_id,option):
                     jsonGetAvResOutputRes['Attributes']['Disk'] = disk
 
                     #data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":memory,"Disk":disk}}
-                    resources[option].append(jsonGetAvResOutputRes)
+                    #print "before",resources
+                    resources[option].append(jsonGetAvResOutputRes.copy())
                     #print "jsonGetAvResOutputRes",json.dumps(jsonGetAvResOutputRes)
                     #print "data",data
                     #resources[option].append(data)
-                    #print resources
+                    #print "after",resources
             #r = json.dumps(resources)
     if "{'Resources': []}" in resources:
         raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')

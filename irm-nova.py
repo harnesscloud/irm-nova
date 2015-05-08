@@ -530,6 +530,32 @@ def calculateResourceCapacity():
         logger.error(error)   
     logger.info("Completed!")
 
+
+@route('/getMetrics/', method='POST')
+@route('/getMetrics', method='POST')
+def getMetrics():
+    logger.info("Called")
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'POST, HEAD')
+    try:          
+        # get the body request
+        try:
+           req = json.load(request.body)
+           print req
+           r = hresmon.getResourceValueStore(req)
+           return r
+        except ValueError:
+           print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout\n"
+           logger.error("Payload was empty or incorrect. A payload must be present and correct")
+
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)   
+    logger.info("Completed!")
+
 # @route('/method/calculateResourceAgg/', method='POST')
 # @route('/method/calculateResourceAgg', method='POST')
 # def calculateResourceAgg():
