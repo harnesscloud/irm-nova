@@ -54,6 +54,7 @@ def apiTest(url,verb,data=None):
         elif verb == "DELETE":
             r = requests.delete(url, data=data, headers=headers)
         result = r.text
+        #print result
     except Exception.message, e:
        response.status = 400
        error = {"message":e,"code":response.status}

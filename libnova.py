@@ -555,3 +555,16 @@ def deleteResources(reservations):
         raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
         logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
         return error
+
+def createResources(data):
+    logger.info("Called")
+    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+    try:
+        r = requests.post(public_url+'/servers', data, headers=headers)
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+    logger.info("Completed!")
+    return r
