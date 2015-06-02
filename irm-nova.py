@@ -227,6 +227,10 @@ def reserveResources():
                frequency = resource['Attributes']['Frequency']
            else:
                frequency = 2.4
+           
+           Monitor = ""
+           if 'Monitor' in resource['Attributes']:
+               Monitor = resource['Attributes']['Monitor']
 
            hostName = ""
           
@@ -272,7 +276,8 @@ def reserveResources():
                           #print r.json()
                           try:
                             ID = r.json()['server']['id']
-                            createMonitorInstance(ID,IP,hostName)
+                            if Monitor:
+                                createMonitorInstance(ID,IP,hostName,Monitor)
                             #print r.json()
                           except KeyError, msg:
                             print r.json()
@@ -365,6 +370,7 @@ def releaseResources():
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         destroyMonitoringInstance(reservations)
+        print reservations
         reply = deleteResources(reservations)
         if "DONE" in reply:
             return { "result": { } }
@@ -615,27 +621,44 @@ def getMetrics():
 
 ################################################################# End API #######################################################################
 
-def createMonitorInstance(uuid,IP,host):
+def createMonitorInstance(uuid,IP,host,template):
     logger.info("Called")
     print "In monitorInstance"
     itype = getInstanceType(host)
     print host,itype
 
-    template = ""
+    print METRICS
 
-    if itype == "QEMU":
-        template = "testJsonAgentRequestVM"
-    elif itype == "docker":
-        template = "testJsonAgentRequestContainer"
+    #template = ""
+
+    #if itype == "QEMU":
+    #    template = "testJsonAgentRequestVM"
+    #elif itype == "docker":
+    #    template = "testJsonAgentRequestContainer"
 
     if template != "":
-        with open (template, "r") as myfile:
-            data=myfile.read()
+        #with open (template, "r") as myfile:
+        #    data=myfile.read()
 
         # update uuid in template with current value
-        r = json.loads(data)
-        r["uuid"] = uuid
-        data = json.dumps(r)
+        print "INITIAL TEMPLATE",template
+        #r = json.loads(template)
+        #r["uuid"] = uuid
+        template.update(METRICS)
+        template['uuid'] = uuid
+
+        if itype == "QEMU":
+            template['instanceType'] = "vm"
+            print "itype",itype
+        if itype == "docker":
+            template['instanceType'] = "container"
+            print "itype",itype
+
+        data = json.dumps(template)
+        print "UPDATED TEMPLATE",template
+        print "data",data
+
+
         hresmon.addResourceStatus(uuid,IP,data,"NEW")
     else:
         print "No hypervisor type found"
@@ -707,10 +730,12 @@ def init(novaapi,tenantname,username,password,interface):
     #print public_url
     global host_list
     host_list = loadHostList()
+    
     global CONFIG
     if 'CONFIG' not in globals():
-        CONFIG = ConfigParser.RawConfigParser()
-        CONFIG.read('irm.cfg')
+      CONFIG = ConfigParser.RawConfigParser()
+      CONFIG.read('irm.cfg')
+    
     global IP_ADDR
     if CONFIG.has_option('main', 'IRM_ADDRESS') and CONFIG.get('main', 'IRM_ADDRESS') != "":
         IP_ADDR=CONFIG.get('main', 'IRM_ADDRESS')
@@ -718,6 +743,13 @@ def init(novaapi,tenantname,username,password,interface):
         IP_ADDR=getifip(interface)
     else:
         IP_ADDR="0.0.0.0"
+
+    global METRICS
+    if CONFIG.has_section('metrics'):
+        mfile = CONFIG.get('metrics', 'METRICS')
+        with open(mfile) as f:
+            METRICS = json.load(f)
+      
  
 def default():
     INTERFACE = "eth0"

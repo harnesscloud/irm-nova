@@ -260,7 +260,7 @@ def getHostDetails(hostname):
         print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
         print ""
         logger.error("Error within public_url or hostname")
-    #print hostDetails    
+    print hostDetails    
     
     if hostDetails:
        return hostDetails
@@ -275,8 +275,8 @@ def createListAvailableResources(host_list,public_url,token_id,option):
     logger.info("Called")
     resources = {option:[]}   
     h_list = getHosts()
-    print h_list
-    print host_list
+    #print h_list
+    #print host_list
     # loop through all hosts
     for novah in h_list:
         for h in host_list['Machine']:

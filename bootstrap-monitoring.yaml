@@ -5,5 +5,8 @@
   #  max_clients: 200
   #remote_user: 
   tasks:
+  - name: Stopping remote supervisor
+    command: pkill supervisord
+  
   - name: starting remote supervisor
     command: supervisord

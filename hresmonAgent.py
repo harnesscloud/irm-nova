@@ -36,7 +36,6 @@ handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",w
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-# this will be moved in the agent code
 def createResourceValuesStore(uuid,metrics):
     query = buildSqlCreate(metrics,uuid)
     db = sqlite3.connect("hresmon.sqlite")
@@ -47,6 +46,19 @@ def createResourceValuesStore(uuid,metrics):
     db.commit()
     db.close
     logger.info("Created table "+tbname)
+
+def createResourceValuesStoreMulti(uuid,metrics):
+    for m in metrics:
+        
+        query = buildSqlCreate(m,uuid)
+        db = sqlite3.connect("hresmon.sqlite")
+        cur = db.cursor()
+        tbname = "resourceValuesStore_"+m['name']+"_"+uuid
+        #cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
+        cur.execute(query)
+        db.commit()
+        db.close
+        logger.info("Created table "+tbname)
 
 # this will be moved in the agent code
 def updateResourceValuesStore(uuid,values):
@@ -109,7 +121,7 @@ def createAgent():
         # get the body request
         try:
            req = json.load(request.body)
-           #print req
+           print req
         except Exception.message, e:
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
@@ -155,7 +167,8 @@ def createAgent():
                 #if container == True:
                 #    t = multiprocessing.Process(name=uuid,target=runAgentC, args=(pollTime,uuid,metrics))
                 #else:
-                t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid,metrics,pid))
+                t = multiprocessing.Process(name=uuid,target=runAgentMulti, args=(pollTime,uuid,metrics,pid))
+                #####t = multiprocessing.Process(name=uuid,target=runAgent, args=(pollTime,uuid,metrics,pid))
                 t.daemon = True
                 t.start()
                 msg = "Agent created"
@@ -309,6 +322,44 @@ def getResourceValueStore():
     
 def runAgent(pollTime,uuid,metrics,pid):
     createResourceValuesStore(uuid,metrics)
+    p = multiprocessing.current_process()
+    #pidCmd = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
+    #pid = getPid(uuid,pidCmd)
+    msg = 'Starting '+p.name+ " to monitor "+pid
+    print msg
+    logger.info(msg)
+    sys.stdout.flush()
+    nproc = subprocess.check_output("nproc", shell=True).rstrip()
+    command = buildCommand(metrics)
+    if "__pid__" in command:
+        command = command.replace("__pid__",pid)
+    
+    print "New command", command
+
+    while True:
+        #getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
+        values = subprocess.check_output(command, shell=True).rstrip()
+        values_decoded = values.decode('utf-8')
+        #print "values_decoded", values_decoded
+        # This convert multiline to singleline
+        values_decoded = values_decoded.replace("\n"," ")
+
+        #print "length values_decoded",len(values_decoded.split(' ', len(values_decoded)))
+        #nmetrics = len(values_decoded.split(' ', len(values_decoded)))
+        #print nmetrics
+        #for i in range(0,nmetrics):
+        #    print metrics[i][0]
+
+        #print "metrics",metrics
+        values = values_decoded.split(' ', len(values_decoded))
+        #print "values", values
+
+        updateResourceValuesStore(uuid,values)
+        time.sleep(pollTime)
+
+
+def runAgentMulti(pollTime,uuid,metrics,pid):
+    createResourceValuesStoreMulti(uuid,metrics)
     p = multiprocessing.current_process()
     #pidCmd = "ps -fe | grep "+uuid+" | grep -v grep | awk '{print $2}'"
     #pid = getPid(uuid,pidCmd)
