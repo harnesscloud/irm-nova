@@ -165,7 +165,9 @@ def start():
     proccount = subprocess.check_output(command,shell=True).count('\n')
     proc = subprocess.check_output(command,shell=True)
     if proccount > 1:
-        print "---Check if "+myname+" is already running. Connection error---"
+        error = "---Check if "+myname+" is already running. Connection error---"
+        print error
+        logger.error(error)
         sys.exit(0)
     else:
         print"hresmon started"

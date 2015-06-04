@@ -621,47 +621,71 @@ def getMetrics():
 
 ################################################################# End API #######################################################################
 
-def createMonitorInstance(uuid,IP,host,template):
+def createMonitorInstance(uuid,IP,host,reqMetrics):
     logger.info("Called")
     print "In monitorInstance"
     itype = getInstanceType(host)
     print host,itype
-
     print METRICS
 
-    #template = ""
-
-    #if itype == "QEMU":
-    #    template = "testJsonAgentRequestVM"
-    #elif itype == "docker":
-    #    template = "testJsonAgentRequestContainer"
-
-    if template != "":
+    if reqMetrics != "":
         #with open (template, "r") as myfile:
         #    data=myfile.read()
 
         # update uuid in template with current value
-        print "INITIAL TEMPLATE",template
+        print "INITIAL METRICS",reqMetrics
         #r = json.loads(template)
         #r["uuid"] = uuid
-        template.update(METRICS)
-        template['uuid'] = uuid
-
+        count = 0
+        
         if itype == "QEMU":
-            template['instanceType'] = "vm"
+            updMetrics = METRICS['vm']
+            #print "len(updMetrics['metrics']:",len(updMetrics['metrics'])
+            #template.update(METRICS['vm'])
+            updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
+            updMetrics['instanceType'] = "vm"
             print "itype",itype
         if itype == "docker":
-            template['instanceType'] = "container"
+            #template.update(METRICS['container'])
+            updMetrics = METRICS['container']
+            updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
+            updMetrics['instanceType'] = "container"
             print "itype",itype
 
-        data = json.dumps(template)
-        print "UPDATED TEMPLATE",template
+        updMetrics['pollTime'] = reqMetrics['pollTime']
+        updMetrics['uuid'] = uuid
+        data = json.dumps(updMetrics)
+        print "UPDATED updMetrics",updMetrics
         print "data",data
 
 
         hresmon.addResourceStatus(uuid,IP,data,"NEW")
     else:
         print "No hypervisor type found"
+
+def mergeRequest(reqMetrics,updMetrics):
+    count = 0
+    while count < len(updMetrics['metrics']):
+        count2 = 0
+        found = False
+        while count2 < len(reqMetrics['metrics']) and (found == False):
+            #print "COMPARING:",updMetrics['metrics'][count]['name'],reqMetrics['metrics'][count2]['name']
+            if updMetrics['metrics'][count]['name'] == reqMetrics['metrics'][count2]['name']:
+                updMetrics['metrics'][count]['pollMulti'] = reqMetrics['metrics'][count2]['pollMulti']
+                found = True
+            else:
+                count2 += 1
+        count += 1
+    return updMetrics
+
+def mergeRequestOptim(reqMetrics,updMetrics):
+    #count = 0
+    for x in updMetrics['metrics']:
+        z = next(y for y in reqMetrics['metrics'] if x['name'] == y['name'])
+        #print "COMPARING:",x['name'],z['name']
+        updMetrics['metrics'][updMetrics['metrics'].index(x)]['pollMulti'] = z['pollMulti']
+
+    return updMetrics
 
 def destroyMonitoringInstance(reservations):
     logger.info("Called")

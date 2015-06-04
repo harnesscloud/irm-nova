@@ -17,7 +17,6 @@ import sqlite3, subprocess, time, sys
 import threading
 import multiprocessing
 from bottle import route, run,response,request,re
-
 import logging
 import logging.handlers as handlers
 
@@ -25,7 +24,8 @@ import logging.handlers as handlers
 #global STATUS
 #STATUS = "NOTRUNNING"
 
-global myname, myprocesses
+global myname, myprocesses, commandTimestamp
+commandTimestamp = "date +%s"
 myname = os.path.basename(__file__)
 
 logger = logging.getLogger("Rotating Log")
@@ -37,7 +37,8 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 def createResourceValuesStore(uuid,metrics):
-    query = buildSqlCreate(metrics,uuid)
+    query = buildSqlCreateSingle(metrics,uuid)
+    print query
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
     tbname = "resourceValuesStore_"+uuid
@@ -48,36 +49,56 @@ def createResourceValuesStore(uuid,metrics):
     logger.info("Created table "+tbname)
 
 def createResourceValuesStoreMulti(uuid,metrics):
+    db = sqlite3.connect("hresmon.sqlite")
     for m in metrics:
-        
-        query = buildSqlCreate(m,uuid)
-        db = sqlite3.connect("hresmon.sqlite")
-        cur = db.cursor()
-        tbname = "resourceValuesStore_"+m['name']+"_"+uuid
-        #cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
-        cur.execute(query)
-        db.commit()
-        db.close
-        logger.info("Created table "+tbname)
+        #print m
+        if m['name'] != "TIMESTAMP":
+            query = buildSqlCreateMulti(m,uuid)
+            print query
+            cur = db.cursor()
+            tbname = "resourceValuesStore_"+m['name']+"_"+uuid
+            #cur.execute('''CREATE TABLE IF NOT EXISTS \"'''+tbname+'''\" ("CPU" FLOAT, "MEM" FLOAT, "TIMESTAMP" FLOAT)''')
+            cur.execute(query)
+            db.commit()
+            logger.info("Created table "+tbname)
+    db.close
 
-# this will be moved in the agent code
 def updateResourceValuesStore(uuid,values):
     #print "In updateResourceValuesStore"
     #values = [cpu,mem,timestamp]
-    query = buildSqlInsert(len(values),uuid)
+    tbname = "resourceValuesStore_"+uuid
+    query = buildSqlInsert(len(values),tbname)
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
-    tbname = "resourceValuesStore_"+uuid
+    
     #cur.execute('''INSERT INTO \"'''+tbname+'''\" VALUES (?,?,?)''',[cpu,mem,timestamp])
     cur.execute(query,values)
     db.commit()
     db.close
     logger.info("Updating table "+tbname)
 
-def buildSqlCreate(metrics,uuid):
+def updateResourceValuesStoreMulti(uuid,name,values):
+    #print "In updateResourceValuesStore"
+    #values = [cpu,mem,timestamp]
+    tbname = "resourceValuesStore_"+name+"_"+uuid
+    query = buildSqlInsert(len(values),tbname)
+    db = sqlite3.connect("hresmon.sqlite")
+    cur = db.cursor()
+    
+    print tbname
+    print query
+
+    #cur.execute('''INSERT INTO \"'''+tbname+'''\" VALUES (?,?,?)''',[cpu,mem,timestamp])
+    cur.execute(query,values)
+    db.commit()
+    db.close
+    logger.info("Updating table "+tbname)
+
+def buildSqlCreateSingle(metrics,uuid):
     tbname = "resourceValuesStore_"+uuid
     columns = ""
     for m in metrics:
+        #print "In buildSqlCreate",m
         columns = columns+"\""+m['name']+"\" "+m['type']+","
 
     columns = columns[:-1]
@@ -85,8 +106,18 @@ def buildSqlCreate(metrics,uuid):
     query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
     return query
 
-def buildSqlInsert(nvalues,uuid):
-    tbname = "resourceValuesStore_"+uuid
+def buildSqlCreateMulti(metrics,uuid):
+    tbname = "resourceValuesStore_"+metrics['name']+"_"+uuid
+    columns = ""
+    columns = columns+"\""+metrics['name']+"\" "+metrics['type']+", \"TIMESTAMP\" FLOAT"
+
+    #columns = columns[:-1]
+
+    query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
+    return query
+
+def buildSqlInsert(nvalues,tbname):
+    #tbname = "resourceValuesStore_"+uuid
     columns = ""
     for i in range(0,nvalues):
         columns = columns+"?,"
@@ -121,7 +152,7 @@ def createAgent():
         # get the body request
         try:
            req = json.load(request.body)
-           print req
+           #print req
         except Exception.message, e:
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
@@ -368,32 +399,67 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
     logger.info(msg)
     sys.stdout.flush()
     nproc = subprocess.check_output("nproc", shell=True).rstrip()
-    command = buildCommand(metrics)
-    if "__pid__" in command:
-        command = command.replace("__pid__",pid)
+    #command = buildCommand(metrics)
     
-    print "New command", command
+    
+    print commandTimestamp
+    #print "In runAgentMulti", metrics
+    
+    pollMultiList = [int(m['pollMulti']) for m in metrics]
+    print "pollMultiList",pollMultiList
+    #tick = min(pollMultiList)
+    #print "tick",tick
+    #print "New command", command
 
     while True:
         #getValues = "top -b -p "+pid+" -n 1 | tail -n 1 | awk '{print $9, $10, strftime(\"%s\")}'"
-        values = subprocess.check_output(command, shell=True).rstrip()
-        values_decoded = values.decode('utf-8')
-        #print "values_decoded", values_decoded
-        # This convert multiline to singleline
-        values_decoded = values_decoded.replace("\n"," ")
+        #toBeMeasured = []
+        try:
+            toBeMeasured = [x for x,y in enumerate(pollMultiList) if y == 1]
+            print toBeMeasured
+        except ValueError:
+            print "List does not contain value 1"
+        #if some of the pollMulti has reached 1
+        pollMultiList = [i - 1 for i in pollMultiList]
 
-        #print "length values_decoded",len(values_decoded.split(' ', len(values_decoded)))
-        #nmetrics = len(values_decoded.split(' ', len(values_decoded)))
-        #print nmetrics
-        #for i in range(0,nmetrics):
-        #    print metrics[i][0]
+        if len(toBeMeasured) > 0:
+            for i in toBeMeasured:
+                command = metrics[i]['command']+";"+commandTimestamp
+                if "__pid__" in command:
+                    command = command.replace("__pid__",pid)
 
-        #print "metrics",metrics
-        values = values_decoded.split(' ', len(values_decoded))
-        #print "values", values
+                values = subprocess.check_output(command, shell=True).rstrip()
+                values_decoded = values.decode('utf-8')
+                #print "values_decoded", values_decoded
+                # This convert multiline to singleline
+                values_decoded = values_decoded.replace("\n"," ")
 
-        updateResourceValuesStore(uuid,values)
+                #print "length values_decoded",len(values_decoded.split(' ', len(values_decoded)))
+                #nmetrics = len(values_decoded.split(' ', len(values_decoded)))
+                #print nmetrics
+                #for i in range(0,nmetrics):
+                #    print metrics[i][0]
+
+                #print "metrics",metrics
+                values = values_decoded.split(' ', len(values_decoded))
+                #print "values", values
+                name = metrics[i]['name']
+                print name
+                updateResourceValuesStoreMulti(uuid,name,values)
+
+    
+                val = int(metrics[i]['pollMulti'])
+                pollMultiList[i] = val
+        
+
+        print toBeMeasured
+        print pollMultiList
+        
         time.sleep(pollTime)
+
+def getTick(metrics):
+    tick = min(metrics,key=attrgetter('pollMulti'))
+    return tick
 
 def runAgentC(pollTime,uuid,metrics):
     #createResourceValuesStore(uuid,metrics)

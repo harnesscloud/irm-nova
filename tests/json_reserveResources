@@ -15,6 +15,9 @@
                      {"name":"CPU", 
                      "type":"FLOAT",
                      "command":"top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $9}'"},
+                     {"name":"MEM", 
+                     "type":"FLOAT",
+                     "command":"top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $10}'"},
                      {"name":"TIMESTAMP",
                      "type":"FLOAT",
                      "command":"date +%s"},
@@ -22,9 +25,37 @@
                      "type":"INT",
                      "command":"nproc"}
                   ],
-                  "uuid":"b86782bd-54a3-48d8-b48d-651e53637161",
-                  "pollTime":"5",
-                  "instanceType":"vm"
+                  "pollTime":"5"
+               }
+         }
+      }
+   ]
+}
+
+{
+   "Resources":[
+      {
+         "ID":"openstack-compute3",
+         "IP":"10.55.164.210",
+         "Type":"Machine",
+         "Attributes":{
+            "Cores":1,
+            "Frequency":2500,
+            "Memory":64,
+            "Disk":2,
+            "Image":"cirros-0.3.3-x86_64",
+            "Monitor":{
+               "metrics":[
+                     {"name":"CPU", 
+                     "pollMulti":"2"},
+                     {"name":"MEM", 
+                     "pollMulti":"3"},
+                     {"name":"TIMESTAMP",
+                     "pollMulti":"1"},
+                     {"name":"NPROC",
+                     "pollMulti":"5"}
+                  ],
+                  "pollTime":"5"
                }
          }
       }
@@ -65,8 +96,42 @@
                "command":"nproc"}
                ],
                "uuid":"f500e968-14c9-4fab-80a0-07b8a86e0d23",
-               "pollTime":"5",
-               "instanceType":"container"
+               "pollTime":"5"
+            }
+         }
+      }
+   ]
+}
+
+
+{
+   "Resources":[
+      {
+         "ID":"openstack-compute1",
+         "IP":"10.55.164.160",
+         "Type":"Machine",
+         "Attributes":{
+            "Cores":1,
+            "Frequency":2500,
+            "Memory":64,
+            "Disk":2,
+            "Image":"shepard/harness",
+            "Monitor":{
+               "metrics":[
+               {"name":"CPU_TOT_TIME", 
+                "pollMulti":"1"},
+               {"name":"CPU_U_S_TIME", 
+                "pollMulti":"5"},
+               {"name":"MEM_TOT_BYTE", 
+                "pollMulti":"4"},
+               {"name":"MEM_U_S_BYTE", 
+                "pollMulti":"3"},
+               {"name":"TIMESTAMP",
+                "pollMulti":"2"},
+               {"name":"NPROC",
+                "pollMulti":"1"}
+               ],
+               "pollTime":"5"
             }
          }
       }
