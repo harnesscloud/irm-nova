@@ -384,6 +384,7 @@ def getResourceValueStoreMulti():
         #names = [tup[1] for tup in cur.fetchall()]
         #print(names)
         matrix = {}
+        files = []
 
         for tbname in tables:
             tbheader = ""
@@ -402,6 +403,7 @@ def getResourceValueStoreMulti():
                 location = "/tmp/"
                 tbfile = open(location+tbname, "wb")
                 tbfile.write(tbheader+"\n")
+                files.append(location+tbname)
 
             #if rformat == "data":
             #    tbs = tbheader+"\n"
@@ -412,9 +414,9 @@ def getResourceValueStoreMulti():
                 try:
                     nl = int(nlines)
                     cur.execute('select * from (select * from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
-                except TypeError, e:
+                except ValueError:
                     response.status = 400
-                    error = {"message":e,"code":response.status}
+                    error = {"message":"ValueError: "+nlines,"code":response.status}
                     return error
                     logger.error(error)
 
@@ -450,7 +452,7 @@ def getResourceValueStoreMulti():
     #matrix = matrix[:-2]
     #print matrix
     if rformat == "file":
-        result = {"Table exported":location+tbname}
+        result = {"Tables exported":files}
     if rformat == "data":
         result = matrix
 
@@ -511,7 +513,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
     #print commandTimestamp
     
     pollMultiList = [int(m['pollMulti']) for m in metrics]
-    print "pollMultiList",pollMultiList
+    #print "pollMultiList",pollMultiList
 
     while True:
         try:

@@ -114,7 +114,7 @@ def getResourceValueStore(req):
         uuid = req['uuid']
         url = getIPbyUuid(uuid)
         jsondata = json.dumps(req)
-        r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
+        r = requests.post('http://'+url+':12000/getResourceValueStoreMulti', data=jsondata, headers=headers)
         updateResourceStatus (uuid,"REPORTED")
         logger.info("response:"+json.dumps(r.json()))
     except Exception.message, e:

@@ -49,11 +49,7 @@
                      {"name":"CPU", 
                      "pollMulti":"2"},
                      {"name":"MEM", 
-                     "pollMulti":"3"},
-                     {"name":"TIMESTAMP",
-                     "pollMulti":"1"},
-                     {"name":"NPROC",
-                     "pollMulti":"5"}
+                     "pollMulti":"3"}
                   ],
                   "pollTime":"5"
                }
@@ -125,11 +121,7 @@
                {"name":"MEM_TOT_BYTE", 
                 "pollMulti":"4"},
                {"name":"MEM_U_S_BYTE", 
-                "pollMulti":"3"},
-               {"name":"TIMESTAMP",
-                "pollMulti":"2"},
-               {"name":"NPROC",
-                "pollMulti":"1"}
+                "pollMulti":"3"}
                ],
                "pollTime":"5"
             }
