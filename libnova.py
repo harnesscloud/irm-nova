@@ -10,7 +10,7 @@
 #
 #
 
-import requests, json, os
+import requests, json, os, copy
 import re
 #from bottle import route, run,response,request,re
 import ConfigParser
@@ -28,10 +28,10 @@ handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,bac
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-with open("templates/json_getAvailableResources") as f:
-        jsonGetAvRes = f.read()
+#with open("templates/json_getAvailableResources") as f:
+#        jsonGetAvRes = f.read()
 
-jsonGetAvResOutputRes = json.loads(jsonGetAvRes)['Output']['Resources'][0]
+#jsonGetAvResOutputRes = json.loads(jsonGetAvRes)['Output']['Resources'][0]
 
 global CONFIG
 if 'CONFIG' not in globals():
@@ -228,7 +228,8 @@ def getInstanceInfo(ID):
 # load resources information not available through nova from file in JSON format
 def loadHostList():
      logger.info("Called")
-     with open('compute_list') as f:
+     hostlistfile = CONFIG.get('main','HOSTLIST')
+     with open(hostlistfile) as f:
             try:
                 hosts = json.load(f)
             except AttributeError:
@@ -260,7 +261,7 @@ def getHostDetails(hostname):
         print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
         print ""
         logger.error("Error within public_url or hostname")
-    print hostDetails    
+    #print hostDetails    
     
     if hostDetails:
        return hostDetails
@@ -268,35 +269,46 @@ def getHostDetails(hostname):
        return None
     logger.info("Completed!")
 
-def createListAvailableResources(host_list,public_url,token_id,option):
+def createListAvailableResources(public_url,token_id,option):
     # create response structure
     
 
     logger.info("Called")
-    resources = {option:[]}   
+    #resources = {option:[]}
+    res = {option:{}}
     h_list = getHosts()
+
+    mem_pr = float(CONFIG.get('overcommit','MEM_PRESERVE'))
+    if mem_pr < 100:
+        mem_pr = mem_pr / 100
+    else:
+        mem_pr = 0.1
+
+    #print "mem_pr", mem_pr
+
     #print h_list
     #print host_list
     # loop through all hosts
     for novah in h_list:
-        for h in host_list['Machine']:
-            if novah == h['host_name']:
+        #for h in host_list['Machine']:
+            #if novah == h['host_name']:
                 #host_split = h.split()
                 # load values
-                hostIP = h['IP']
-                hostName = h['host_name']
+                #hostIP = h['IP']
+                ####hostName = h['host_name']
                 #costCores = h['Cost']['Cores']
                 #costMemory = h['Cost']['Memory']
                 #costDisk = h['Cost']['Disk']
-                frequency = h['frequency']
-                location = h['location']
+                #frequency = h['frequency']
+                #location = h['location']
                 #CRSID = location+hostIP+"/machine/"+hostName
                 
                                  
                 #print hostName,costCores,costMemory,costDisk
                 # get details from nova
                  
-                hostDetails = getHostDetails(hostName)
+                hostDetails = getHostDetails(novah)
+                #print hostDetails
                 nCores = 0
                 memory = 0
                 total_cpu = 0
@@ -309,6 +321,7 @@ def createListAvailableResources(host_list,public_url,token_id,option):
              
                  # load detail from nova reply
                 if 'host' in hostDetails:
+                    
                     for majorkey in hostDetails['host']:
                         if majorkey['resource']['project'] == '(total)':
                             total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
@@ -320,19 +333,26 @@ def createListAvailableResources(host_list,public_url,token_id,option):
                             used_disk = majorkey['resource']['disk_gb']
                         # calculate available resources
                         nCores = total_cpu - used_cpu
-                        memory = int(total_mem - used_mem - 0.1 * total_mem)
+                        # memory is calculated 10% less than actual value to avoid commiting it all
+                        memory = int(total_mem - used_mem - mem_pr * total_mem)
                         disk = total_disk - used_disk
-                    # build response
-                    jsonGetAvResOutputRes['IP'] = hostIP
-                    jsonGetAvResOutputRes['ID'] = hostName
-                    jsonGetAvResOutputRes['Attributes']['Cores'] = nCores
-                    jsonGetAvResOutputRes['Attributes']['Frequency'] = frequency
-                    jsonGetAvResOutputRes['Attributes']['Memory'] = memory
-                    jsonGetAvResOutputRes['Attributes']['Disk'] = disk
 
+                    #print "hostName",hostName,"nCores",nCores,"memory",memory,"disk",disk
+                    # build response
+                    #jsonGetAvResOutputRes['IP'] = hostIP
+                    #jsonGetAvResOutputRes['ID'] = hostName
+                    #jsonGetAvResOutputRes['Attributes']['Cores'] = nCores
+                    #jsonGetAvResOutputRes['Attributes']['Frequency'] = frequency
+                    #jsonGetAvResOutputRes['Attributes']['Memory'] = memory
+                    #jsonGetAvResOutputRes['Attributes']['Disk'] = disk
+
+                    res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory,"Disk":disk}}
+                    
+                    #####res[option][hostName] = copy.deepcopy(jsonGetAvResOutputRes)
+                    
                     #data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":memory,"Disk":disk}}
                     #print "before",resources
-                    resources[option].append(jsonGetAvResOutputRes.copy())
+                    #resources[option].append(copy.deepcopy(jsonGetAvResOutputRes))
                     #print "jsonGetAvResOutputRes",json.dumps(jsonGetAvResOutputRes)
                     #print "data",data
                     #resources[option].append(data)
@@ -345,8 +365,8 @@ def createListAvailableResources(host_list,public_url,token_id,option):
      
     logger.info("Completed!")
 
-    if resources:
-        return resources
+    if res:
+        return res
     else:
         return None
 

@@ -65,14 +65,14 @@ jsonGetResT = json.loads(jsonGetResT)['Output']
 ######################################################## API ###################################################################
 
 # To be fixed with GET
-@route('/getAvailableResources/', method='GET')
-@route('/getAvailableResources', method='GET')
-def getAvailableResources(): 
+@route('/getResources/', method='GET')
+@route('/getResources', method='GET')
+def getResources(): 
     logger.info("Called")
 
     try:        
         option = "Resources"   
-        resources = createListAvailableResources(host_list,public_url,token_id,option) 
+        resources = createListAvailableResources(public_url,token_id,option) 
         r = {"result":resources}       
 
         result = json.dumps(r)
@@ -147,7 +147,7 @@ def verifyResources():
     	reply = checkResources(req)
 
         option = "AvailableResources"
-        resources = createListAvailableResources(host_list,public_url,token_id,option)
+        resources = createListAvailableResources(public_url,token_id,option)
         #print resources
         #print reply
         #reply["Reservations"]
@@ -171,9 +171,9 @@ def verifyResources():
 
     logger.info("Completed!")
 
-@route('/reserveResources/', method='POST')
-@route('/reserveResources', method='POST')
-def reserveResources():
+@route('/createReservation/', method='POST')
+@route('/createReservation', method='POST')
+def createReservation():
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -199,7 +199,8 @@ def reserveResources():
         for resource in req['Resources']:
            #print resource
            # load values
-           IP = resource['IP']
+           #IP = resource['IP']
+           ID = resource['ID']
            #print "Image", resource['Image']
            if 'Image' in resource['Attributes']:
                image = getImageUUIDbyName(resource['Attributes']['Image'])
@@ -223,27 +224,28 @@ def reserveResources():
                disk = resource['Attributes']['Disk']
            else:
                disk = 20 * 1024
-           if 'Frequency' in resource['Attributes']:
-               frequency = resource['Attributes']['Frequency']
-           else:
-               frequency = 2.4
+           #if 'Frequency' in resource['Attributes']:
+           #    frequency = resource['Attributes']['Frequency']
+           #else:
+           #    frequency = 2.4
            
            Monitor = ""
            if 'Monitor' in resource['Attributes']:
                Monitor = resource['Attributes']['Monitor']
 
-           hostName = ""
+           #hostName = ""
           
            for novah in h_list:
                #print host_list
-               for h in host_list['Machine']:
+               #for h in host_list['Machine']:
                    #print novah, h
-                   if novah == h['host_name']:
+                   #if novah == h['host_name']:
                        # load values
-                       if h['IP'] == IP:
-                          hostName = h['host_name']
+                       #if h['IP'] == IP:
+                       if novah == ID:
+                          #hostName = h['host_name']
                           # build host for availability_zone option to target specific host
-                          host = "nova:"+hostName
+                          host = "nova:"+novah
                           name = "HARNESS-"+createRandomID(6)
                           createFlavor(name,vcpu,memory,disk)
                           headers = {'content-type': 'application/json','X-Auth-Token': token_id}
@@ -277,7 +279,7 @@ def reserveResources():
                           try:
                             ID = r.json()['server']['id']
                             if Monitor:
-                                createMonitorInstance(ID,IP,hostName,Monitor)
+                                createMonitorInstance(ID,novah,Monitor)
                             #print r.json()
                           except KeyError, msg:
                             print r.json()
@@ -629,11 +631,12 @@ def getMetrics():
 
 ################################################################# End API #######################################################################
 
-def createMonitorInstance(uuid,IP,host,reqMetrics):
+def createMonitorInstance(uuid,host,reqMetrics):
     logger.info("Called")
     print "In monitorInstance"
     itype = getInstanceType(host)
-    print host,itype
+    fullhostname = host+"."+DHCP_EXTENSION
+    print fullhostname,itype
     print METRICS
 
     if reqMetrics != "":
@@ -667,7 +670,7 @@ def createMonitorInstance(uuid,IP,host,reqMetrics):
         print "data",data
 
 
-        hresmon.addResourceStatus(uuid,IP,data,"NEW")
+        hresmon.addResourceStatus(uuid,fullhostname,data,"NEW")
     else:
         print "No hypervisor type found"
 
@@ -760,8 +763,8 @@ def init(novaapi,tenantname,username,password,interface):
     global public_url
     public_url = getEndPoint(os_api_url, token_id)
     #print public_url
-    global host_list
-    host_list = loadHostList()
+    #global host_list
+    #host_list = loadHostList()
     
     global CONFIG
     if 'CONFIG' not in globals():
@@ -775,6 +778,10 @@ def init(novaapi,tenantname,username,password,interface):
         IP_ADDR=getifip(interface)
     else:
         IP_ADDR="0.0.0.0"
+
+    global DHCP_EXTENSION
+    if CONFIG.has_option('main', 'DHCP_EXTENSION') and CONFIG.get('main', 'DHCP_EXTENSION') != "":
+        DHCP_EXTENSION = CONFIG.get('main', 'DHCP_EXTENSION')
 
     global METRICS
     if CONFIG.has_section('metrics'):
