@@ -57,11 +57,6 @@ handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,bac
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-with open("templates/json_getResourceTypes") as f:
-    jsonGetResT = f.read()
-
-jsonGetResT = json.loads(jsonGetResT)['Output']
-
 ######################################################## API ###################################################################
 
 # To be fixed with GET
@@ -93,17 +88,21 @@ def getResources():
     return result
     
 # To be fixed with GET
-@route('/getResourceTypes/', method='GET')
-@route('/getResourceTypes', method='GET')
-def getResourceTypes():
+@route('/getAllocSpec/', method='GET')
+@route('/getAllocSpec', method='GET')
+def getAllocSpec():
     logger.info("Called")
     try:
+        with open("templates/json_getResourceTypes") as f:
+            jsonGetResT = f.read()
+
+        jsonGetResT = json.loads(jsonGetResT)['Output']
         #data = createListAvailableResources(host_list,public_url,token_id)
-        types = {"Types":[]}
+        #types = {"Types":[]}
         #data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"},"Image":{"Description":"Image name","DataType":"string"},"UserData":{"Description":"User custom data","DataType":"string"}}}
-        types["Types"].append(jsonGetResT)
-               
-        result = {"result":types}
+        #types["Types"].append(jsonGetResT)
+
+        result = {"result":jsonGetResT}
         r = json.dumps(result)
         
     except Exception.message, e:
@@ -124,9 +123,9 @@ def getResourceTypes():
 
 
 # To be fixed with GET
-@route('/verifyResources/', method='POST')
-@route('/verifyResources', method='POST')
-def verifyResources():
+@route('/checkReservation/', method='POST')
+@route('/checkReservation', method='POST')
+def checkReservation():
     logger.info("Called")
     try:
         #print ID
@@ -137,22 +136,21 @@ def verifyResources():
         print " "
         logger.error("Payload was empty. A payload must be present")
     
-   
     #print "in verifyResources"
-   # print reply
+    #print reply
     #network = getNetworks()[0]
     #print network
     #print "===> NETWORKS:", getNetworks()
     try:
     	reply = checkResources(req)
 
-        option = "AvailableResources"
-        resources = createListAvailableResources(public_url,token_id,option)
+        ####option = "AvailableResources"
+        ####resources = createListAvailableResources(public_url,token_id,option)
         #print resources
         #print reply
         #reply["Reservations"]
         #print reply
-        reply.update(resources)
+        #####reply.update(resources)
         #print reply
         result = {"result":reply}
         #print result
@@ -360,9 +358,9 @@ def releaseResources(ID):
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/releaseResources/', method='DELETE')
-@route('/releaseResources', method='DELETE')
-def releaseResources():
+@route('/releaseReservation/', method='DELETE')
+@route('/releaseReservation', method='DELETE')
+def releaseReservation():
     logger.info("Called")
     try:
     	reservations = json.load(request.body)
@@ -389,9 +387,9 @@ def releaseResources():
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/releaseAllResources/', method='DELETE')
-@route('/releaseAllResources', method='DELETE')
-def releaseResources():
+@route('/releaseAllReservation/', method='DELETE')
+@route('/releaseAllReservation', method='DELETE')
+def releaseAllReservation():
     logger.info("Called")
     try:
         reservations = getListInstances()
@@ -429,9 +427,9 @@ def releaseResources():
 
     logger.info("Completed!")
 
-@route('/calculateResourceCapacity/', method='POST')
-@route('/calculateResourceCapacity', method='POST')
-def calculateResourceCapacity():
+@route('/computeCapacity/', method='POST')
+@route('/computeCapacity', method='POST')
+def computeCapacity():
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -449,8 +447,8 @@ def calculateResourceCapacity():
         disk = 0
         
         # optional reserve
-        if 'Reserve' in req:
-		     for majorkey in req['Reserve']:
+        if 'Allocation' in req:
+		     for majorkey in req['Allocation']:
 		        try:
 		           if majorkey['Attributes'].has_key('Cores'):
 		             cores = cores - majorkey['Attributes']['Cores']
@@ -525,10 +523,12 @@ def calculateResourceCapacity():
            attribs["Disk"] = attribs["Disk"] + disk
            exceed_capacity = attribs["Disk"] < 0                                    
         if exceed_capacity:
-           reply = { }
+           reply = "Allocation cannot be satisfied"
+           result = {"Error":reply}
         else:
            reply = {"Resource":{"Type":rType,"Attributes":attribs}}
-        result = {"result":reply}
+           result = {"result":reply}
+        
         jsondata = json.dumps(result)
         return jsondata
     except Exception.message, e:

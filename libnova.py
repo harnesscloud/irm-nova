@@ -358,7 +358,7 @@ def createListAvailableResources(public_url,token_id,option):
                     #resources[option].append(data)
                     #print "after",resources
             #r = json.dumps(resources)
-    if "{'Resources': []}" in resources:
+    if "{'Resources': []}" in res:
         raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
         logger.error("Failed to append 'data' variable. 'Resources' variable empty")
 
@@ -506,7 +506,7 @@ def checkResources(data):
     #print "data in checkResources before",data
     
     
-    reply = {"Reservations":[]}
+    reply = {"Instances":[]}
     if data['Reservations']:
         #print "Data not empty"
         req = data
@@ -538,8 +538,8 @@ def checkResources(data):
                 #response.set_header('Content-Type', 'application/json')
                 #response.set_header('Accept', '*/*')
                 #response.set_header('Allow', 'POST, HEAD')
-                data = {"ID":ID,"Ready":status,"Address":IP}
-                reply["Reservations"].append(data)
+                data = {ID:{"Ready":status,"Address":IP}}
+                reply["Instances"].append(data)
             # When there is no ID, this case occurs    
             if ID in req['Reservations'] is None:
                raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')

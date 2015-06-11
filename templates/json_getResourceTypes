@@ -2,40 +2,44 @@
 {
 	"Input":"",
 	"Output":
+	{
+		"Types":
 		{
-			"Type":"Machine",
-			"Attributes":
-				{
-					"Cores":
-						{
-							"Description":"Number of cores",
-							"DataType":"int"
-						},
-					"Frequency":
-						{
-							"Description":"Processor frequency",
-							"DataType":"double"
-						},
-					"Memory":
-						{
-							"Description":"Amount of RAM",
-							"DataType":"int"
-						},
-					"Disk":
-						{
-							"Description":"Disk capacity",
-							"DataType":"int"
-						},
-					"Image":
-						{
-							"Description":"Image name",
-							"DataType":"string"
-						},
-					"UserData":
-						{
-							"Description":"User custom data",
-							"DataType":"string"
-						}
-				}
-		}
+			"Machine":
+			{
+				"Cores":
+					{
+						"Description":"Number of cores",
+						"DataType":"int"
+					},
+				"Memory":
+					{
+						"Description":"Amount of RAM",
+						"DataType":"int"
+					},
+				"Disk":
+					{
+						"Description":"Disk capacity",
+						"DataType":"int"
+					},
+				"Image":
+					{
+						"Description":"Image name",
+						"DataType":"string"
+					}
+			}
+		},
+	    "Monitor":{
+	    	"Metrics":
+	    	{
+	        	"Machine":
+	        	{
+	            	"CPU_TOT_TIME": {"Description": "CPU Total Time", "DataType":"FLOAT"},
+	            	"CPU_U_S_TIME": {"Description": "CPU User Space Time", "DataType":"FLOAT"},
+	            	"MEM_TOT_TIME": {"Description": "MEM Total Time", "DataType":"FLOAT"},
+	            	"MEM_U_S_TIME": {"Description": "MEM User Space Time", "DataType":"FLOAT"}
+	         	}
+	      	}    
+	    } 
+	}
 }
