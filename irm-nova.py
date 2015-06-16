@@ -552,7 +552,8 @@ def getMetrics():
             req = json.load(request.body)
             print "IN GETMETRICS, REQUEST",req
             r = hresmon.getResourceValueStore(req)
-            res = r.json()
+            #res = r.json()
+            res = r
             if "message" in res:
                 raise ValueError(res['message'])
             return r

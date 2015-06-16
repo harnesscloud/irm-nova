@@ -406,12 +406,23 @@ def deleteFlavor(ID):
 def cleanFlavors():
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
-    r = requests.get(public_url+'/flavors', headers=headers)
+    try:
+        r = requests.get(public_url+'/flavors', headers=headers)
 
-    for flavor in r.json()['flavors']:
-        if "HARNESS" in flavor['name']:
-            deleteFlavor(flavor['id'])
-            #print flavor
+        for flavor in r.json()['flavors']:
+            if "HARNESS" in flavor['name']:
+                deleteFlavor(flavor['id'])
+                #print flavor
+    except ValueError:
+        error = {"message":"ValueError","code":"500"}
+        print error
+        return error
+        logger.error(error)
+    except requests.exceptions.RequestException:
+        error = {"message":"RequestException","code":"500"}
+        print error
+        return error
+        logger.error(error)
 
     logger.info("Completed!")
 

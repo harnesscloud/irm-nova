@@ -88,21 +88,22 @@ def updateResourceValuesStoreMulti(uuid,name,values):
 
 def buildSqlCreateSingle(metrics,uuid):
     tbname = "resourceValuesStore_"+uuid
-    columns = ""
+    #columns = ""
+    columns = "\"TIMESTAMP\" FLOAT"
     for m in metrics:
         #print "In buildSqlCreate",m
         columns = columns+"\""+m['name']+"\" "+m['type']+","
 
     #columns = columns[:-1]
-    columns = columns+" \"TIMESTAMP\" FLOAT"
+    
 
     query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
     return query
 
 def buildSqlCreateMulti(metrics,uuid):
     tbname = "resourceValuesStore_"+metrics['name']+"_"+uuid
-    columns = ""
-    columns = columns+"\""+metrics['name']+"\" "+metrics['type']+", \"TIMESTAMP\" FLOAT"
+    #columns = ""
+    columns ="\"TIMESTAMP\" FLOAT, \""+metrics['name']+"\" "+metrics['type']
 
     #columns = columns[:-1]
 
@@ -360,6 +361,7 @@ def getResourceValueStoreMulti():
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
+        print "req:",req
         uuid = req['uuid']
         rformat = req['format']
         nlines = req['lines']
@@ -412,6 +414,7 @@ def getResourceValueStoreMulti():
                 cur.execute('select * from \"'+tbname+'\"')
             else:
                 try:
+                    # check if integer value
                     nl = int(nlines)
                     cur.execute('select * from (select * from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
                 except ValueError:
@@ -526,7 +529,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
 
         if len(toBeMeasured) > 0:
             for i in toBeMeasured:
-                command = metrics[i]['command']+";"+commandTimestamp
+                command = commandTimestamp+";"+metrics[i]['command']
                 if "__pid__" in command:
                     command = command.replace("__pid__",pid)
 

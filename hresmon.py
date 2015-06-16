@@ -67,6 +67,12 @@ def createAgent(data,url):
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    except requests.exceptions.RequestException:
+        error = {"message":"socket error","code":"500"}
+        print error
+        return error
+        logger.error(error)
+
     logger.info("Completed!")
     return r
 
@@ -75,7 +81,7 @@ def destroyAgent(uuid):
     print "In destroyAgent"
     headers = {'content-type': 'application/json'}
     try:
-        url = getIPbyUuid(uuid)
+        url = getUrlbyUuid(uuid)
         data = {"uuid":uuid}
         jsondata = json.dumps(data)
         print jsondata
@@ -87,12 +93,18 @@ def destroyAgent(uuid):
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    except requests.exceptions.RequestException:
+        error = {"message":"RequestException","code":"500"}
+        print error
+        return error
+        logger.error(error)
+
     logger.info("Completed!")
     return r
 
-def getIPbyUuid(uuid):
+def getUrlbyUuid(uuid):
     logger.info("Called")
-    print "In getIPbyUuid"
+    print "In getUrlbyUuid"
     ip = ""
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
@@ -110,20 +122,33 @@ def getResourceValueStore(req):
     print "In getResourceValueStore"
     logger.info("Called")
     headers = {'content-type': 'application/json'}
+    result = {}
     try:
-        uuid = req['uuid']
-        url = getIPbyUuid(uuid)
-        jsondata = json.dumps(req)
-        r = requests.post('http://'+url+':12000/getResourceValueStoreMulti', data=jsondata, headers=headers)
-        updateResourceStatus (uuid,"REPORTED")
-        logger.info("response:"+json.dumps(r.json()))
+        for uuid in req['Reservations']:
+            print "UUID",uuid
+            url = getUrlbyUuid(uuid)
+            request = {"uuid":uuid,"format":req['format'],"lines":req['lines']}
+            jsondata = json.dumps(request)
+            r = requests.post('http://'+url+':12000/getResourceValueStoreMulti', data=jsondata, headers=headers)
+            #print r.json()
+            updateResourceStatus (uuid,"REPORTED")
+            result[uuid] = r.json()
+        logger.info("response:"+json.dumps(result))
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    except Exception,e:
+        error = {"message":e,"code":"500"}
+        return error
+        logger.error(error)
+    except TypeError,e:
+        error = {"message":e,"code":"500"}
+        return error
+        logger.error(error)
     logger.info("Completed!")
-    return r
+    return result
 
 def createStatsListener():
     print "In createStatsListener"
@@ -140,12 +165,18 @@ def checkNewRequests():
         all_rows = cursor.fetchall()
         for row in all_rows:
             print row[0],row[3]
-            r = createAgent(row[2],row[1])
-            res = r.json()
-            print res
-            if 'code' not in res:
-                updateResourceStatus(row[0],"RUNNING")
-        time.sleep(10)
+            try:
+                r = createAgent(row[2],row[1])
+                res = r.json()
+                print res
+                if 'code' not in res:
+                    updateResourceStatus(row[0],"RUNNING")
+            except AttributeError,e:
+                error = {"message":e,"code":"444"}
+                print error
+                return error
+                logger.error(error)
+                time.sleep(10)
 
     db.close
 
