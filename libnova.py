@@ -157,6 +157,7 @@ def getListInstances():
 
     r = requests.get(public_url+'/servers', headers=headers)
     #print r
+    reservations = None
     try:
         instanceList = []
         response = r.json()

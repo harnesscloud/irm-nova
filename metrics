@@ -17,6 +17,13 @@
                {"name":"MEM_U_S_BYTE", 
                "type":"FLOAT",
                "command":"cat /sys/fs/cgroup/memory/docker/__pid__*/memory.usage_in_bytes"}
+          ],
+          "derived":
+          [
+               {"name":"CPU_PERC",
+               "type":"FLOAT"},
+               {"name":"MEM_PERC",
+               "type":"FLOAT"}
           ]
      },
      "vm":

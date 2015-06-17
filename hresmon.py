@@ -129,7 +129,7 @@ def getResourceValueStore(req):
             url = getUrlbyUuid(uuid)
             request = {"uuid":uuid,"format":req['format'],"lines":req['lines']}
             jsondata = json.dumps(request)
-            r = requests.post('http://'+url+':12000/getResourceValueStoreMulti', data=jsondata, headers=headers)
+            r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
             #print r.json()
             updateResourceStatus (uuid,"REPORTED")
             result[uuid] = r.json()
@@ -176,7 +176,8 @@ def checkNewRequests():
                 print error
                 return error
                 logger.error(error)
-                time.sleep(10)
+            
+            time.sleep(5)
 
     db.close
 

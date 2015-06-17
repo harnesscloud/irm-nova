@@ -66,8 +66,9 @@ def createResourceValuesStoreMulti(uuid,metrics):
         logger.info("Created table "+tbname)
     db.close
 
-def updateResourceValuesStore(uuid,values):
-    tbname = "resourceValuesStore_"+uuid
+def updateResourceValuesStore(nuuid,values):
+    tbname = "resourceValuesStore_"+nuuid
+    #print "VALUES",values
     query = buildSqlInsert(len(values),tbname)
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
@@ -76,27 +77,25 @@ def updateResourceValuesStore(uuid,values):
     db.close
     logger.info("Updating table "+tbname)
 
-def updateResourceValuesStoreMulti(uuid,name,values):
-    tbname = "resourceValuesStore_"+name+"_"+uuid
-    query = buildSqlInsert(len(values),tbname)
-    db = sqlite3.connect("hresmon.sqlite")
-    cur = db.cursor()
-    cur.execute(query,values)
-    db.commit()
-    db.close
-    logger.info("Updating table "+tbname)
+# def updateResourceValuesStoreMulti(uuid,name,values):
+#     tbname = "resourceValuesStore_"+name+"_"+uuid
+#     query = buildSqlInsert(len(values),tbname)
+#     db = sqlite3.connect("hresmon.sqlite")
+#     cur = db.cursor()
+#     cur.execute(query,values)
+#     db.commit()
+#     db.close
+#     logger.info("Updating table "+tbname)
 
 def buildSqlCreateSingle(metrics,uuid):
     tbname = "resourceValuesStore_"+uuid
     #columns = ""
-    columns = "\"TIMESTAMP\" FLOAT"
+    columns = "\"TIMESTAMP\" FLOAT, "
     for m in metrics:
         #print "In buildSqlCreate",m
         columns = columns+"\""+m['name']+"\" "+m['type']+","
 
-    #columns = columns[:-1]
-    
-
+    columns = columns[:-1]
     query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
     return query
 
@@ -153,6 +152,11 @@ def createAgent():
            return error
 
         metrics = req['metrics']
+        #print "metrics before", metrics
+        #if "derived" in req:
+        #    metrics.append(req['derived'])
+
+        #print "metrics after", metrics
         #command = req['command']
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
@@ -284,7 +288,143 @@ def getResourceValueStore():
         except ValueError:
            print "Attempting to load a non-existent payload, please enter desired layout\n"
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
+        #print "MODE",MODE
+        jsondata = getValuesStore(req) if MODE == "SINGLE" else getValuesStoreMulti(req)
+        
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
+    #print "JSONDATA",jsondata
+    return jsondata
+
+# @route('/getResourceValueStoreMulti/', method='POST')
+# @route('/getResourceValueStoreMulti', method='POST')
+# def getResourceValueStoreMulti():
+#     logger.info("Called")
+#     print "In getResourceValueStoreMulti"
+
+#     response.set_header('Content-Type', 'application/json')
+#     response.set_header('Accept', '*/*')
+#     response.set_header('Allow', 'POST, HEAD')
+
+#     try:
+#         try:
+#            req = json.load(request.body)
+#         except ValueError:
+#            print "Attempting to load a non-existent payload, please enter desired layout\n"
+#            logger.error("Payload was empty or incorrect. A payload must be present and correct")
+
+#         #print "req:",req
+#         uuid = req['uuid']
+#         rformat = req['format']
+#         nlines = req['lines']
+#         #print "getResourceValueStore request", uuid
+
+#         #tbname = "resourceValuesStore_"+uuid
+        
+        
+#         db = sqlite3.connect("hresmon.sqlite")
+#         cur = db.cursor()
+
+#         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
+
+#         #print sqlGetTablesByuuid
+
+#         cur.execute(sqlGetTablesByuuid)
+#         #tables = cur.fetchall()
+#         tables = [str(table[0]) for table in cur.fetchall()]
+#         #print tables
+
+#         # collect names in a list
+#         #names = [tup[1] for tup in cur.fetchall()]
+#         #print(names)
+#         matrix = {}
+#         files = []
+
+#         for tbname in tables:
+#             tbheader = ""
+#             tbs = ""
+#             #print "tbname",tbname
+#             #print "tbname.find('resourceValuesStore_')",tbname.find('resourceValuesStore_')
+#             #print "tbname.find('_'+uuid)",tbname.find('_'+uuid)
+#             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
+
+#             cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
+#             for tup in cur.fetchall():
+#                 tbheader = tbheader + tup[1] +" "
+#                 #print tup[1]
+            
+#             if rformat == "file":
+#                 location = "/tmp/"
+#                 tbfile = open(location+tbname, "wb")
+#                 tbfile.write(tbheader+"\n")
+#                 files.append(location+tbname)
+
+#             #if rformat == "data":
+#             #    tbs = tbheader+"\n"
+
+#             if nlines == "all":
+#                 cur.execute('select * from \"'+tbname+'\"')
+#             else:
+#                 try:
+#                     # check if integer value
+#                     nl = int(nlines)
+#                     cur.execute('select * from (select * from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
+#                 except ValueError:
+#                     response.status = 400
+#                     error = {"message":"ValueError: "+nlines,"code":response.status}
+#                     return error
+#                     logger.error(error)
+
+#             tb = cur.fetchall()
+#             for row in tb:
+#                 #print row
+#                 values = ""
+#                 for v in range(0,len(row)):
+#                     values = values+'{} '.format(row[v])
+#                     #values = values+str(row[v])+" "
+#                     #print values
+#                 #print values
+#                 #values = values + "\n"
+#                 if rformat == "file":
+#                     tbfile.write(values+ "\n")
+#                 if rformat == "data":
+#                     tbs = tbs + values+ "\n"
+
+#             if rformat == "file":
+#                 tbfile.close()
+
+#             #print tbs
+#             #matrix = matrix+"\""+str(METRIC)+"\""+":"+"\""+str(tbs)+"\""+",\n"
+#             matrix[str(METRIC)] = tbs
+        
+#         db.close()
+#     except Exception.message, e:
+#         response.status = 400
+#         error = {"message":e,"code":response.status}
+#         return error
+#         logger.error(error)
+    
+#     #matrix = matrix[:-2]
+#     #print matrix
+#     if rformat == "file":
+#         result = {"Tables exported":files}
+#     if rformat == "data":
+#         result = matrix
+
+#     #print result
+#     logger.info(result)
+#     jsondata = json.dumps(result)
+#     return jsondata
+
+def getValuesStore(req):
+    logger.info("Called")
+    print "In getValueStore"
+
+    try:
         uuid = req['uuid']
         rformat = req['format']
         print "getResourceValueStore request", uuid
@@ -309,7 +449,7 @@ def getResourceValueStore():
             tbfile = open(location+tbname, "wb")
             tbfile.write(tbheader+"\n")
 
-        if rformat == "data":
+        if rformat == "rawdata":
             tbs = tbheader+"\n"
 
         cur.execute('select * from \"'+tbname+'\"')
@@ -323,7 +463,7 @@ def getResourceValueStore():
             #values = values + "\n"
             if rformat == "file":
                 tbfile.write(values+ "\n")
-            if rformat == "data":
+            if rformat == "rawdata":
                 tbs = tbs + values+ "\n"
 
         if rformat == "file":
@@ -338,34 +478,24 @@ def getResourceValueStore():
 
     if rformat == "file":
         result = {"Table exported":location+tbname}
-    if rformat == "data":
+    if rformat == "rawdata":
         result = {"Table exported":tbs}
     logger.info(result)
     jsondata = json.dumps(result)
+    print "JSONDATA",jsondata
     return jsondata
 
-@route('/getResourceValueStoreMulti/', method='POST')
-@route('/getResourceValueStoreMulti', method='POST')
-def getResourceValueStoreMulti():
+def getValuesStoreMulti(req):
     logger.info("Called")
-    print "In getResourceValueStoreMulti"
-
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD')
+    print "In getValueStoreMulti"
 
     try:
-        try:
-           req = json.load(request.body)
-        except ValueError:
-           print "Attempting to load a non-existent payload, please enter desired layout\n"
-           logger.error("Payload was empty or incorrect. A payload must be present and correct")
-
-        print "req:",req
+        
+        #print "req:",req
         uuid = req['uuid']
         rformat = req['format']
         nlines = req['lines']
-        print "getResourceValueStore request", uuid
+        #print "getResourceValueStore request", uuid
 
         #tbname = "resourceValuesStore_"+uuid
         
@@ -435,7 +565,7 @@ def getResourceValueStoreMulti():
                 #values = values + "\n"
                 if rformat == "file":
                     tbfile.write(values+ "\n")
-                if rformat == "data":
+                if rformat == "rawdata":
                     tbs = tbs + values+ "\n"
 
             if rformat == "file":
@@ -446,6 +576,23 @@ def getResourceValueStoreMulti():
             matrix[str(METRIC)] = tbs
         
         db.close()
+
+        if rformat == "file":
+            result = {"Tables exported":files}
+        if rformat == "rawdata":
+            result = matrix
+
+        #print result
+        logger.info(result)
+        jsondata = json.dumps(result)
+        return jsondata
+
+    except UnboundLocalError:
+        response.status = 500
+        error = {"message":"UnboundLocalError","code":response.status}
+        return error
+        logger.error(error)
+
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
@@ -454,16 +601,7 @@ def getResourceValueStoreMulti():
     
     #matrix = matrix[:-2]
     #print matrix
-    if rformat == "file":
-        result = {"Tables exported":files}
-    if rformat == "data":
-        result = matrix
-
-    #print result
-    logger.info(result)
-    jsondata = json.dumps(result)
-    return jsondata
-
+    
     
 def runAgent(pollTime,uuid,metrics,pid):
     createResourceValuesStore(uuid,metrics)
@@ -545,7 +683,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
                     values[0] = float(values[0])/int(nproc)
                 
                 #print values
-                updateResourceValuesStoreMulti(uuid,name,values)
+                updateResourceValuesStore(name+"_"+uuid,values)
                 val = int(metrics[i]['pollMulti'])
                 pollMultiList[i] = val
         
