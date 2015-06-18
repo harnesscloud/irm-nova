@@ -550,8 +550,32 @@ def getMetrics():
         # get the body request
         try:
             req = json.load(request.body)
-            print "IN GETMETRICS, REQUEST",req
-            r = hresmon.getResourceValueStore(req)
+            #print "IN GETMETRICS, REQUEST",req
+            #print "METRICS file",METRICS
+            derivedMetrics = None
+            nlines = req['lines']
+            if nlines != "all":
+                try:
+                    nl = int(nlines)
+                    if 'derived' in (METRICS['container']) and req['format'] == "derived":
+                        derivedMetrics = METRICS['container']['derived']
+                except ValueError:
+                    response.status = 400
+                    error = {"message":"ValueError: "+nlines,"code":response.status}
+                    return error
+                    logger.error(error)
+            else:
+                try:
+                    if req['format'] == "derived":
+                        raise ValueError
+                except ValueError:
+                    response.status = 400
+                    e = nlines + " and " + req['format'] + " bad combination, cannot be in the same request"
+                    error = {"message":"ValueError: "+e,"code":response.status}
+                    return error
+                    logger.error(error)
+
+            r = hresmon.getResourceValueStore(req,derivedMetrics)
             #res = r.json()
             res = r
             if "message" in res:
@@ -656,13 +680,14 @@ def createMonitorInstance(uuid,host,reqMetrics):
             #template.update(METRICS['vm'])
             updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
             updMetrics['instanceType'] = "vm"
-            print "itype",itype
+
         if itype == "docker":
             #template.update(METRICS['container'])
             updMetrics = METRICS['container']
             updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
             updMetrics['instanceType'] = "container"
-            print "itype",itype
+            
+        print "itype",itype
 
         updMetrics['pollTime'] = reqMetrics['pollTime']
         updMetrics['uuid'] = uuid

@@ -437,9 +437,6 @@ def getValuesStore(req):
 
         cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
 
-        # collect names in a list
-        #names = [tup[1] for tup in cur.fetchall()]
-        #print(names)
         tbheader = ""
         for tup in cur.fetchall():
             tbheader = tbheader + tup[1] +" "
@@ -488,57 +485,34 @@ def getValuesStore(req):
 def getValuesStoreMulti(req):
     logger.info("Called")
     print "In getValueStoreMulti"
-
+    #print "req", req
     try:
-        
-        #print "req:",req
         uuid = req['uuid']
         rformat = req['format']
         nlines = req['lines']
-        #print "getResourceValueStore request", uuid
 
-        #tbname = "resourceValuesStore_"+uuid
-        
-        
         db = sqlite3.connect("hresmon.sqlite")
         cur = db.cursor()
-
         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
-
-        #print sqlGetTablesByuuid
-
         cur.execute(sqlGetTablesByuuid)
-        #tables = cur.fetchall()
         tables = [str(table[0]) for table in cur.fetchall()]
-        #print tables
-
-        # collect names in a list
-        #names = [tup[1] for tup in cur.fetchall()]
-        #print(names)
         matrix = {}
         files = []
 
         for tbname in tables:
             tbheader = ""
             tbs = ""
-            #print "tbname",tbname
-            #print "tbname.find('resourceValuesStore_')",tbname.find('resourceValuesStore_')
-            #print "tbname.find('_'+uuid)",tbname.find('_'+uuid)
             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
 
             cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
             for tup in cur.fetchall():
                 tbheader = tbheader + tup[1] +" "
-                #print tup[1]
             
             if rformat == "file":
                 location = "/tmp/"
                 tbfile = open(location+tbname, "wb")
                 tbfile.write(tbheader+"\n")
                 files.append(location+tbname)
-
-            #if rformat == "data":
-            #    tbs = tbheader+"\n"
 
             if nlines == "all":
                 cur.execute('select * from \"'+tbname+'\"')
@@ -559,28 +533,30 @@ def getValuesStoreMulti(req):
                 values = ""
                 for v in range(0,len(row)):
                     values = values+'{} '.format(row[v])
-                    #values = values+str(row[v])+" "
-                    #print values
-                #print values
-                #values = values + "\n"
+
                 if rformat == "file":
                     tbfile.write(values+ "\n")
-                if rformat == "rawdata":
+                if rformat in ('rawdata','derived'):
                     tbs = tbs + values+ "\n"
 
             if rformat == "file":
                 tbfile.close()
 
-            #print tbs
-            #matrix = matrix+"\""+str(METRIC)+"\""+":"+"\""+str(tbs)+"\""+",\n"
             matrix[str(METRIC)] = tbs
         
+        #print "matrix 1",matrix
         db.close()
 
         if rformat == "file":
             result = {"Tables exported":files}
         if rformat == "rawdata":
             result = matrix
+        if rformat == "derived":
+            if 'derived' in req:
+                derived = req['derived']
+                #print "matrix 2",matrix
+                updMatrix = calculateDerived(matrix,derived)
+                result = updMatrix
 
         #print result
         logger.info(result)
@@ -598,10 +574,100 @@ def getValuesStoreMulti(req):
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+
+def calculateDerived(matrix,derived):
+    logger.info("Called")
+    print "In calculateDerived"
+    #print "matrix", matrix
+
+    CPU_U_S_TIME_before = 1.0
+    CPU_TOT_TIME_before = 1.0
+    MEM_U_S_BYTE_before = 1.0
+    MEM_TOT_BYTE_before = 1.0
+
+    CPU_U_S_TIME_after = 1.0
+    CPU_TOT_TIME_after = 1.0
+    MEM_U_S_BYTE_after = 1.0
+    MEM_TOT_BYTE_after = 1.0
+
+    for metric in matrix:
+        print "metric",metric
+        listValues = matrix[metric].split('\n')
+
+        if metric == "CPU_U_S_TIME":
+            CPU_U_S_TIME_before = float(listValues[0].split(' ',1)[1])
+            CPU_U_S_TIME_after = float(listValues[len(listValues)-2].split(' ',1)[1])
+        elif metric == "CPU_TOT_TIME":
+            CPU_TOT_TIME_before = float(listValues[0].split(' ',1)[1])
+            CPU_TOT_TIME_after = float(listValues[len(listValues)-2].split(' ',1)[1])
+        elif metric == "MEM_U_S_BYTE":
+            MEM_U_S_BYTE_before = float(listValues[0].split(' ',1)[1])
+            MEM_U_S_BYTE_after = float(listValues[len(listValues)-2].split(' ',1)[1])
+        elif metric == "MEM_TOT_BYTE":
+            MEM_TOT_BYTE_before = float(listValues[0].split(' ',1)[1])
+            MEM_TOT_BYTE_after = float(listValues[len(listValues)-2].split(' ',1)[1])
+
+
+    if CPU_TOT_TIME_after == CPU_TOT_TIME_before:
+        print "OPTION 1"
+        CPU_TOT_TIME_DELTA = CPU_TOT_TIME_after
+    else:
+        print "OPTION 2"
+        CPU_TOT_TIME_DELTA = CPU_TOT_TIME_after - CPU_TOT_TIME_before
     
-    #matrix = matrix[:-2]
-    #print matrix
+    print "CPU_TOT_TIME_before",CPU_TOT_TIME_before
+    print "CPU_TOT_TIME_after",CPU_TOT_TIME_after
+    print "CPU_TOT_TIME_DELTA",CPU_TOT_TIME_DELTA
     
+    
+    if CPU_U_S_TIME_after == CPU_U_S_TIME_before:
+        print "OPTION 3"
+        CPU_U_S_TIME_DELTA = CPU_U_S_TIME_after
+    else:
+        print "OPTION 4"
+        CPU_U_S_TIME_DELTA = CPU_U_S_TIME_after - CPU_U_S_TIME_before
+
+    print "CPU_U_S_TIME_before",CPU_U_S_TIME_before
+    print "CPU_U_S_TIME_after",CPU_U_S_TIME_after
+    print "CPU_U_S_TIME_DELTA",CPU_U_S_TIME_DELTA
+
+
+    if MEM_TOT_BYTE_after == MEM_TOT_BYTE_before:
+        print "OPTION 5"
+        MEM_TOT_BYTE_DELTA = MEM_TOT_BYTE_after
+    else:
+        print "OPTION 6"
+        MEM_TOT_BYTE_DELTA = MEM_TOT_BYTE_after - MEM_TOT_BYTE_before
+
+    print "MEM_TOT_BYTE_before",MEM_TOT_BYTE_before
+    print "MEM_TOT_BYTE_after",MEM_TOT_BYTE_after
+    print "MEM_TOT_BYTE_DELTA",MEM_TOT_BYTE_DELTA
+
+
+    if MEM_U_S_BYTE_after == MEM_U_S_BYTE_before:
+        print "OPTION 7"
+        MEM_U_S_BYTE_DELTA = MEM_U_S_BYTE_after
+    else:
+        print "OPTION 8"
+        MEM_U_S_BYTE_DELTA = abs(MEM_U_S_BYTE_after - MEM_U_S_BYTE_before)
+
+    print "MEM_U_S_BYTE_before",MEM_U_S_BYTE_before
+    print "MEM_U_S_BYTE_after",MEM_U_S_BYTE_after
+    print "MEM_U_S_BYTE_DELTA",MEM_U_S_BYTE_DELTA
+
+
+    CPU_PERC = round(100*CPU_U_S_TIME_DELTA/CPU_TOT_TIME_DELTA,2)
+    MEM_PERC = round(100*MEM_U_S_BYTE_DELTA/MEM_TOT_BYTE_DELTA,2)
+
+    print "CPU_PERC",CPU_PERC
+    print "MEM_PERC",MEM_PERC
+        #print "length", len(listValues)
+
+    updMatrix = matrix
+    updMatrix['CPU_PERC'] = CPU_PERC
+    updMatrix['MEM_PERC'] = MEM_PERC
+
+    return updMatrix
     
 def runAgent(pollTime,uuid,metrics,pid):
     createResourceValuesStore(uuid,metrics)
