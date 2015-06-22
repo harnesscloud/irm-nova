@@ -93,15 +93,10 @@ def getResources():
 def getAllocSpec():
     logger.info("Called")
     try:
-        with open("templates/json_getResourceTypes") as f:
+        with open("templates/json_getAllocSpec") as f:
             jsonGetResT = f.read()
 
         jsonGetResT = json.loads(jsonGetResT)['Output']
-        #data = createListAvailableResources(host_list,public_url,token_id)
-        #types = {"Types":[]}
-        #data = {"Type":"Machine","Attributes":{"Cores":{"Description":"Number of cores","DataType":"int"},"Frequency":{"Description":"Processor frequency","DataType":"double"},"Memory":{"Description":"Amount of RAM","DataType":"int"},"Disk":{"Description":"Disk capacity","DataType":"int"},"Image":{"Description":"Image name","DataType":"string"},"UserData":{"Description":"User custom data","DataType":"string"}}}
-        #types["Types"].append(jsonGetResT)
-
         result = {"result":jsonGetResT}
         r = json.dumps(result)
         
@@ -195,7 +190,7 @@ def createReservation():
         #print h_list
 
         for resource in req['Resources']:
-           #print resource
+           print resource
            # load values
            #IP = resource['IP']
            ID = resource['ID']

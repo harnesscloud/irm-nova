@@ -119,10 +119,11 @@ def getHosts():
      
      #print r.text
     # print headers
-    # print "public url"
+    #print "public url",public_url
     # print public_url
-    # print "token id"
+    #print "token id",token_id
     # print token_id
+    #print "response",r.text
    
     if str(token_id) not in str(headers):
         raise AttributeError("N-Irm: [getHosts] Failure to assign headers. Possibly incorrect token_id")
@@ -138,8 +139,8 @@ def getHosts():
 
     hosts = []
     for majorkey in r.json()['hosts']:
-            if majorkey['service'] == 'compute':
-                hosts.append(majorkey['host_name'])
+        if majorkey['service'] == 'compute':
+            hosts.append(majorkey['host_name'])
     if hosts:
             return hosts
     else:
