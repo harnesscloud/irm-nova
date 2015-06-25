@@ -85,6 +85,7 @@ def destroyAgent(uuid):
         data = {"uuid":uuid}
         jsondata = json.dumps(data)
         print jsondata
+        print "url",url
         r = requests.delete('http://'+url+':12000/terminateAgent', data=jsondata, headers=headers)
         updateResourceStatus (uuid,"ENDED")
         logger.info("response:"+json.dumps(r.json()))

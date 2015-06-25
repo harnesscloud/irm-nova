@@ -165,7 +165,9 @@ def createAgent():
         #print "metrics, command, uuid, pollTime",metrics,command,uuid,pollTime
 
         # check if the pid exists
-        if instanceType == "container":
+        if instanceType == "docker":
+            pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
+        elif instanceType == "lxc":
             pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
         elif instanceType == "vm":
             pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
@@ -487,15 +489,18 @@ def getValuesStoreMulti(req):
     print "In getValueStoreMulti"
     #print "req", req
     try:
+        #print req
         uuid = req['uuid']
         rformat = req['format']
         nlines = req['lines']
+        #print uuid,rformat,nlines
 
         db = sqlite3.connect("hresmon.sqlite")
         cur = db.cursor()
         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
         cur.execute(sqlGetTablesByuuid)
         tables = [str(table[0]) for table in cur.fetchall()]
+        #print tables
         matrix = {}
         files = []
 
@@ -503,6 +508,7 @@ def getValuesStoreMulti(req):
             tbheader = ""
             tbs = ""
             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
+            #print "tbname",tbname
 
             cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
             for tup in cur.fetchall():
@@ -552,13 +558,15 @@ def getValuesStoreMulti(req):
         if rformat == "rawdata":
             result = matrix
         if rformat == "derived":
-            if 'derived' in req:
-                derived = req['derived']
-                #print "matrix 2",matrix
-                updMatrix = calculateDerived(matrix,derived)
-                result = updMatrix
+            #print "check 1"
+            #if 'derived' in req:
+            #    derived = req['derived']
+            #print "check 2"
+            #print "matrix 2",matrix
+            updMatrix = calculateDerived(matrix)
+            result = updMatrix
 
-        #print result
+        print result
         logger.info(result)
         jsondata = json.dumps(result)
         return jsondata
@@ -575,7 +583,7 @@ def getValuesStoreMulti(req):
         return error
         logger.error(error)
 
-def calculateDerived(matrix,derived):
+def calculateDerived(matrix):
     logger.info("Called")
     print "In calculateDerived"
     #print "matrix", matrix

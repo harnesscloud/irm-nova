@@ -469,9 +469,22 @@ def getImageUUIDbyName(name):
     r = requests.get(public_url+'/images', headers=headers)
     #print "GLANCE IMAGES",r.text
 
-    for image in r.json()["images"]:
-        if image["name"] == name:
-            imageId = image["id"]
+    try:
+        imageId=""
+        #print name
+        #print r.json()["images"]
+        for image in r.json()["images"]:
+            if image["name"] == name:
+                imageId = image["id"]
+                break
+            else:
+                imageId = "Image Not Found"
+            #print imageId
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
     return imageId
 
@@ -486,10 +499,21 @@ def getNetUUIDbyName(name):
     #print "public_url:",public_url
     r = requests.get(public_url+'/os-networks', headers=headers)
     #print "GLANCE IMAGES",r.text
-
-    for net in r.json()["networks"]:
-        if net["label"] == name:
-            netId = net["id"]
+    try:
+        netId = ""
+        print name
+        for net in r.json()["networks"]:
+            print net["label"]
+            if net["label"] == name:
+                netId = net["id"]
+                break
+            else:
+                netId = "Net ID not Found"
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
     return netId
 
@@ -525,6 +549,7 @@ def checkResources(data):
         req = data
         try:            
             for ID in req['Reservations']:
+                print "ID",ID
                 status = "false"
                 osstatus = "BUILD"               
                 try:
@@ -542,7 +567,7 @@ def checkResources(data):
                     logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
                 IP = "100"
                 # change to private to vmnet in field below
-                #print info['server']
+                print info
                 for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                     if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                         IP = private['addr']
@@ -562,6 +587,7 @@ def checkResources(data):
             logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
     else:
         print "Data empty"
+        reply = "Empty"
 
     #print "reply in checkResources after",reply
     return reply
