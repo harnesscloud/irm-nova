@@ -158,21 +158,27 @@ def createAgent():
 
         #print "metrics after", metrics
         #command = req['command']
+        print req
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
         instanceType = req['instanceType']
         
         #print "metrics, command, uuid, pollTime",metrics,command,uuid,pollTime
 
+        print "instanceType", instanceType
         # check if the pid exists
         if instanceType == "docker":
             pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
+            pid = getPid(uuid,pidCmd)
         elif instanceType == "lxc":
-            pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
+            pid = req['instanceName']
+            #pidCmd = "ps -fe | grep \""+instanceName+" \" | grep -v grep | awk '{print $2}'"
         elif instanceType == "vm":
             pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
+            pid = getPid(uuid,pidCmd)
         
-        pid = getPid(uuid,pidCmd) 
+        
+         
         if pid == "":
             msg = "No process existing for Agent "+uuid
             logger.error("No pid exists for process "+uuid)
@@ -263,6 +269,9 @@ def getProcessByName(uuid):
                 return p
     except Exception.message, e:
         return e
+
+def getPidByName(instanceName):
+    print "In getPidByName"
 
 def getPid(uuid,cmd):
     pid = subprocess.check_output(cmd, shell=True).rstrip()
@@ -756,7 +765,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
                 if name == "CPU":
                     values[0] = float(values[0])/int(nproc)
                 
-                #print values
+                print values
                 updateResourceValuesStore(name+"_"+uuid,values)
                 val = int(metrics[i]['pollMulti'])
                 pollMultiList[i] = val

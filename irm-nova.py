@@ -46,6 +46,7 @@ from threading import Thread
 import logging
 import logging.handlers as handlers
 from libnova import *
+
 #from pudb import set_trace; set_trace()
 
 #Config and format for logging messages
@@ -182,14 +183,14 @@ def createReservation():
         	print " "
 
         cleanFlavors()
-        reservation = {"Reservations":[]}
+        reservation = {"ReservationID":[]}
         # loop through all requested resources
         name = ""
         #print "============> ", req['Resources']
         h_list = getHosts()
         #print h_list
 
-        for resource in req['Resources']:
+        for resource in req['Allocation']:
             print "resource",resource
             # load values
             #IP = resource['IP']
@@ -283,7 +284,7 @@ def createReservation():
                                 #print dobj
                                                                                           
                                 data = json.dumps(dobj)
-                                print "data before creating instance: ", data
+                                #print "data before creating instance: ", data
                                 #print "Creating instance number "+str(i+1)+", name "+name
                                 print "Creating instance "+name
                                 #r = requests.post(public_url+'/servers', data, headers=headers)
@@ -293,7 +294,7 @@ def createReservation():
                                 #print r.json()
                                 try:
                                     serverID = r.json()['server']['id']
-                                    print "serverID",serverID
+                                    #print "serverID",serverID
                                     if Monitor:
                                         createMonitorInstance(serverID,novah,Monitor)
                                     #print r.json()
@@ -308,7 +309,7 @@ def createReservation():
                                         #    print "Status of "+name+" "+status
                                 #instanceID = {"InfReservID":ID}
                                 try:
-                                    reservation["Reservations"].append(serverID)
+                                    reservation["ReservationID"].append(serverID)
                                 except UnboundLocalError:
                                     print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
                                     logger.error("Attempting to append the ID when it has not been assigned yet")
@@ -331,10 +332,10 @@ def createReservation():
 
         try:
             #print "before requests"
-            print "data before", reservation
+            #print "data before", reservation
             #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
-            print reply
+            #print reply
 
             if "false" in reply:
                 #print "found false"
@@ -404,7 +405,7 @@ def releaseReservation():
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         destroyMonitoringInstance(reservations)
-        print reservations
+        #print reservations
         reply = deleteResources(reservations)
         if "DONE" in reply:
             return { "result": { } }
@@ -442,7 +443,7 @@ def releaseAllReservation():
             return { "result": reply }
     #return r
 
-        if ID in req['Reservations'] is None:            	
+        if ID in req['ReservationID'] is None:            	
             raise UnboundLocalError
     except UnboundLocalError:
         raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
@@ -694,20 +695,20 @@ def createMonitorInstance(uuid,host,reqMetrics):
     logger.info("Called")
     print "In monitorInstance"
     itype = getInstanceType(host)
-    if DHCP_EXTENSION:
+    if DHCP_EXTENSION != "":
         fullhostname = host+"."+DHCP_EXTENSION
     else:
         fullhostname = host
 
     print fullhostname,itype
-    print METRICS
+    #print METRICS
 
     if reqMetrics != "":
         #with open (template, "r") as myfile:
         #    data=myfile.read()
 
         # update uuid in template with current value
-        print "INITIAL METRICS",reqMetrics
+        #print "INITIAL METRICS",reqMetrics
         #r = json.loads(template)
         #r["uuid"] = uuid
         count = 0
@@ -730,6 +731,9 @@ def createMonitorInstance(uuid,host,reqMetrics):
             updMetrics = METRICS['lxc']
             updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
             updMetrics['instanceType'] = "lxc"
+            updMetrics['instanceName'] = getInstanceName(uuid)
+            #instanceName = getInstanceName(uuid)
+            #print "I'm in createMonitorInstance",instanceName
             
         print "itype",itype
 
@@ -737,12 +741,13 @@ def createMonitorInstance(uuid,host,reqMetrics):
         updMetrics['uuid'] = uuid
         data = json.dumps(updMetrics)
         print "UPDATED updMetrics",updMetrics
-        print "data",data
+        #print "data",data
 
 
         hresmon.addResourceStatus(uuid,fullhostname,data,"NEW")
     else:
         print "No hypervisor type found"
+
 
 def mergeRequest(reqMetrics,updMetrics):
     count = 0
@@ -772,10 +777,10 @@ def destroyMonitoringInstance(reservations):
     logger.info("Called")
     print "In destroyMonitoringInstance"
     print "reservations",reservations
-    for ID in reservations['Reservations']:
+    for ID in reservations['ReservationID']:
         print "uuid",ID
         r = hresmon.destroyAgent(ID)
-    #print r
+    print r
 
 
 def registerIRM():
@@ -912,6 +917,7 @@ Copyright 2014-2015 SAP Ltd
        global CONFIG
        CONFIG = ConfigParser.RawConfigParser()
        CONFIG.read(options.config)
+       libnovaInit(options.config)
 
        print options.config
        
