@@ -21,7 +21,7 @@ import logging
 import logging.handlers as handlers
 from libnova import *
 import hresmonAgent
-from daemon import *
+#from daemon import *
 
 global myname, myprocesses
 myname = os.path.basename(__file__)
