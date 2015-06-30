@@ -33,10 +33,11 @@ logger.addHandler(handler)
 
 #jsonGetAvResOutputRes = json.loads(jsonGetAvRes)['Output']['Resources'][0]
 
-global CONFIG
-if 'CONFIG' not in globals():
-    CONFIG = ConfigParser.RawConfigParser()
-    CONFIG.read('irm.cfg')
+def libnovaInit(conf_file):
+    global CONFIG
+    if 'CONFIG' not in globals():
+        CONFIG = ConfigParser.RawConfigParser()
+        CONFIG.read(conf_file)
 
 def getIP(url):
     logger.info("Called")
@@ -169,7 +170,7 @@ def getListInstances():
                 #print "GOT ",subname, instance
                 instanceList.append(instance['id'])
         #print instanceList
-        reservations = {"Reservations":instanceList}
+        reservations = {"ReservationID":instanceList}
         #print json.dumps(reservations)
     except ValueError:
         print "N-Irm: [getInstanceList] r = requests.get failed. Possible error with public_url or hostname"
@@ -469,9 +470,22 @@ def getImageUUIDbyName(name):
     r = requests.get(public_url+'/images', headers=headers)
     #print "GLANCE IMAGES",r.text
 
-    for image in r.json()["images"]:
-        if image["name"] == name:
-            imageId = image["id"]
+    try:
+        imageId=""
+        #print name
+        #print r.json()["images"]
+        for image in r.json()["images"]:
+            if image["name"] == name:
+                imageId = image["id"]
+                break
+            else:
+                imageId = "Image Not Found"
+            #print imageId
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
     return imageId
 
@@ -486,10 +500,21 @@ def getNetUUIDbyName(name):
     #print "public_url:",public_url
     r = requests.get(public_url+'/os-networks', headers=headers)
     #print "GLANCE IMAGES",r.text
-
-    for net in r.json()["networks"]:
-        if net["label"] == name:
-            netId = net["id"]
+    try:
+        netId = ""
+        print name
+        for net in r.json()["networks"]:
+            print net["label"]
+            if net["label"] == name:
+                netId = net["id"]
+                break
+            else:
+                netId = "Net ID not Found"
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
     return netId
 
@@ -520,11 +545,13 @@ def checkResources(data):
     
     
     reply = {"Instances":[]}
-    if data['Reservations']:
+    if data['ReservationID']:
         #print "Data not empty"
         req = data
         try:            
-            for ID in req['Reservations']:
+            for ID in req['ReservationID']:
+                print "ID",ID
+                ERROR = False
                 status = "false"
                 osstatus = "BUILD"               
                 try:
@@ -538,23 +565,26 @@ def checkResources(data):
 
                 except TypeError:
                     print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
-                    print " "
+                    #print " "
                     logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
-                IP = "100"
-                # change to private to vmnet in field below
-                #print info['server']
-                for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
-                    if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
-                        IP = private['addr']
-                        #print "IP:", IP
-                #status = r.json()['server']['status']
-                #response.set_header('Content-Type', 'application/json')
-                #response.set_header('Accept', '*/*')
-                #response.set_header('Allow', 'POST, HEAD')
-                data = {ID:{"Ready":status,"Address":IP}}
-                reply["Instances"].append(data)
+                    ERROR = True
+
+                if not ERROR:
+                    IP = []
+                    # change to private to vmnet in field below
+
+                    for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
+                        if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
+                            IP.append(private['addr'])
+                            #print "IP:", IP
+                    #status = r.json()['server']['status']
+                    #response.set_header('Content-Type', 'application/json')
+                    #response.set_header('Accept', '*/*')
+                    #response.set_header('Allow', 'POST, HEAD')
+                    data = {ID:{"Ready":status,"Address":IP}}
+                    reply["Instances"].append(data)
             # When there is no ID, this case occurs    
-            if ID in req['Reservations'] is None:
+            if ID in req['ReservationID'] is None:
                raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
                logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
         except UnboundLocalError:
@@ -562,6 +592,7 @@ def checkResources(data):
             logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
     else:
         print "Data empty"
+        reply = "Empty"
 
     #print "reply in checkResources after",reply
     return reply
@@ -571,7 +602,7 @@ def deleteResources(reservations):
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
     try:
-        for ID in reservations['Reservations']:              
+        for ID in reservations['ReservationID']:              
             try:
                 #forces it to break is incorrect ID
                 info = getInstanceInfo(ID)
@@ -584,7 +615,7 @@ def deleteResources(reservations):
                 logger.error("Payload was incorrect. ID possibly missing or incorrect")
         # Thrown to enforce exception below
         return "DONE"
-        if ID in reservations['Reservations'] is None:               
+        if ID in reservations['ReservationID'] is None:               
             raise UnboundLocalError
     except UnboundLocalError:
         raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
@@ -603,6 +634,46 @@ def createResources(data):
         logger.error(error)
     logger.info("Completed!")
     return r
+
+def getInstanceName(uuid):
+    print "In getInstanceName"
+    logger.info("Called")
+    headers = {'X-Auth-Token': token_id}
+
+    try:
+
+        if str(token_id) not in str(headers):
+            raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
+            logger.error("Failed to assign headers. Possible fault in token_id")
+        
+        r = requests.get(public_url+'/servers/'+uuid, headers=headers)
+        
+        result = r.json()
+        #print "result server keys",result["server"].keys()
+        #print "SERVER DETAILS",result["server"]["id"]
+        #print "SERVER DETAILS",result["server"]["OS-EXT-SRV-ATTR:instance_name"]
+        instanceName = result["server"]["OS-EXT-SRV-ATTR:instance_name"]
+    except AttributeError:
+        print "N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id"
+        logger.error("Failed to assign headers. Possible fault in token_id")
+
+    #instanceName = result['server']['OS-EXT-SRV-ATTR: instance_name']
+    
+    #print "getInstanceName",instanceName
+
+    return instanceName
+    #for h in result['hypervisors']:
+    #    if h['service']['host'] == host:
+    #        htype = h['hypervisor_type']
+    #        break
+
+    #return htype
+    #if len(networks) > 0:
+    #        return networks
+    #else:
+    #        return None
+    logger.info("Completed!")
+
 
 def getInstanceType(host):
     logger.info("Called")

@@ -1,5 +1,5 @@
 {    
-     "container":
+     "docker":
      {
           "metrics":
           [
@@ -17,6 +17,26 @@
                {"name":"MEM_U_S_BYTE", 
                "type":"FLOAT",
                "command":"cat /sys/fs/cgroup/memory/docker/__pid__*/memory.usage_in_bytes"}
+          ]
+     },
+     "lxc":
+     {
+          "metrics":
+          [
+               {"name":"CPU_TOT_TIME", 
+               "type":"FLOAT",
+               "command":"cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
+               },
+               {"name":"CPU_U_S_TIME", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/cpuacct/libvirt/lxc/__pid__/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
+               },
+               {"name":"MEM_TOT_BYTE", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.limit_in_bytes"},
+               {"name":"MEM_U_S_BYTE", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.usage_in_bytes"}
           ]
      },
      "vm":

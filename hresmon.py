@@ -82,12 +82,16 @@ def destroyAgent(uuid):
     headers = {'content-type': 'application/json'}
     try:
         url = getUrlbyUuid(uuid)
-        data = {"uuid":uuid}
-        jsondata = json.dumps(data)
-        print jsondata
-        r = requests.delete('http://'+url+':12000/terminateAgent', data=jsondata, headers=headers)
-        updateResourceStatus (uuid,"ENDED")
-        logger.info("response:"+json.dumps(r.json()))
+        if url != "":
+            data = {"uuid":uuid}
+            jsondata = json.dumps(data)
+            print jsondata
+            print "url",url
+            r = requests.delete('http://'+url+':12000/terminateAgent', data=jsondata, headers=headers)
+            updateResourceStatus (uuid,"ENDED")
+            logger.info("response:"+json.dumps(r.json()))
+        else:
+            r = "No Agent for",uuid
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
@@ -110,9 +114,13 @@ def getUrlbyUuid(uuid):
     cur = db.cursor()
     query = "SELECT HOST FROM resources WHERE uuid = \'"+uuid+"\'"
     cur.execute(query)
-    [ip] = cur.fetchone()
-    print ip
-    logger.info("Completed!")
+    try:
+        [ip] = cur.fetchone()
+        logger.info("Completed!")
+    except TypeError, e:
+        error = {"message":e,"code":"500"}
+        print error
+        logger.error(error)
     return ip
 
 def destroyAllAgents():
@@ -124,7 +132,7 @@ def getResourceValueStore(req,derivedMetrics=None):
     headers = {'content-type': 'application/json'}
     result = {}
     try:
-        for uuid in req['Reservations']:
+        for uuid in req['ReservationID']:
             print "UUID",uuid
             url = getUrlbyUuid(uuid)
             request = {"uuid":uuid,"format":req['format'],"lines":req['lines']}

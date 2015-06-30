@@ -158,19 +158,27 @@ def createAgent():
 
         #print "metrics after", metrics
         #command = req['command']
+        print req
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
         instanceType = req['instanceType']
         
         #print "metrics, command, uuid, pollTime",metrics,command,uuid,pollTime
 
+        print "instanceType", instanceType
         # check if the pid exists
-        if instanceType == "container":
+        if instanceType == "docker":
             pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
+            pid = getPid(uuid,pidCmd)
+        elif instanceType == "lxc":
+            pid = req['instanceName']
+            #pidCmd = "ps -fe | grep \""+instanceName+" \" | grep -v grep | awk '{print $2}'"
         elif instanceType == "vm":
             pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
+            pid = getPid(uuid,pidCmd)
         
-        pid = getPid(uuid,pidCmd) 
+        
+         
         if pid == "":
             msg = "No process existing for Agent "+uuid
             logger.error("No pid exists for process "+uuid)
@@ -261,6 +269,9 @@ def getProcessByName(uuid):
                 return p
     except Exception.message, e:
         return e
+
+def getPidByName(instanceName):
+    print "In getPidByName"
 
 def getPid(uuid,cmd):
     pid = subprocess.check_output(cmd, shell=True).rstrip()
@@ -487,15 +498,18 @@ def getValuesStoreMulti(req):
     print "In getValueStoreMulti"
     #print "req", req
     try:
+        #print req
         uuid = req['uuid']
         rformat = req['format']
         nlines = req['lines']
+        #print uuid,rformat,nlines
 
         db = sqlite3.connect("hresmon.sqlite")
         cur = db.cursor()
         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
         cur.execute(sqlGetTablesByuuid)
         tables = [str(table[0]) for table in cur.fetchall()]
+        #print tables
         matrix = {}
         files = []
 
@@ -503,6 +517,7 @@ def getValuesStoreMulti(req):
             tbheader = ""
             tbs = ""
             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
+            #print "tbname",tbname
 
             cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
             for tup in cur.fetchall():
@@ -552,13 +567,15 @@ def getValuesStoreMulti(req):
         if rformat == "rawdata":
             result = matrix
         if rformat == "derived":
-            if 'derived' in req:
-                derived = req['derived']
-                #print "matrix 2",matrix
-                updMatrix = calculateDerived(matrix,derived)
-                result = updMatrix
+            #print "check 1"
+            #if 'derived' in req:
+            #    derived = req['derived']
+            #print "check 2"
+            #print "matrix 2",matrix
+            updMatrix = calculateDerived(matrix)
+            result = updMatrix
 
-        #print result
+        print result
         logger.info(result)
         jsondata = json.dumps(result)
         return jsondata
@@ -575,7 +592,7 @@ def getValuesStoreMulti(req):
         return error
         logger.error(error)
 
-def calculateDerived(matrix,derived):
+def calculateDerived(matrix):
     logger.info("Called")
     print "In calculateDerived"
     #print "matrix", matrix
@@ -748,7 +765,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
                 if name == "CPU":
                     values[0] = float(values[0])/int(nproc)
                 
-                #print values
+                print values
                 updateResourceValuesStore(name+"_"+uuid,values)
                 val = int(metrics[i]['pollMulti'])
                 pollMultiList[i] = val

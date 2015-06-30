@@ -46,6 +46,7 @@ from threading import Thread
 import logging
 import logging.handlers as handlers
 from libnova import *
+
 #from pudb import set_trace; set_trace()
 
 #Config and format for logging messages
@@ -182,116 +183,146 @@ def createReservation():
         	print " "
 
         cleanFlavors()
-        reservation = {"Reservations":[]}
+        reservation = {"ReservationID":[]}
         # loop through all requested resources
         name = ""
         #print "============> ", req['Resources']
         h_list = getHosts()
         #print h_list
 
-        for resource in req['Resources']:
-           print resource
-           # load values
-           #IP = resource['IP']
-           ID = resource['ID']
-           #print "Image", resource['Image']
-           if 'Image' in resource['Attributes']:
-               image = getImageUUIDbyName(resource['Attributes']['Image'])
-           else:
-               if CONFIG.has_option('CRS','IMAGE_NAME'):
-                   image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
-           #print "Image after", image
-           user_data = ''
-           if 'UserData' in resource['Attributes']:
-               user_data = resource['Attributes']['UserData']
+        for resource in req['Allocation']:
+            print "resource",resource
+            # load values
+            #IP = resource['IP']
+            ID = resource['ID']
+            #print "Image", resource['Image']
+            try:
+                if 'Image' in resource['Attributes']:
+                    image = getImageUUIDbyName(resource['Attributes']['Image'])
+                    #print image
+                    if image == "Image Not Found":
+                        msg = "Image Not Found"
+                        raise Exception
+                else:
+                    if CONFIG.has_option('CRS','IMAGE_NAME'):
+                        image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
+                #print "Image after", image
+                user_data = ''
+                if 'UserData' in resource['Attributes']:
+                    user_data = resource['Attributes']['UserData']
 
-           if 'Cores' in resource['Attributes']:
-               vcpu = resource['Attributes']['Cores']
-           else:
-               vcpu = 1
-           if 'Memory' in resource['Attributes']:
-               memory = resource['Attributes']['Memory']
-           else:
-               memory = 2048
-           if 'Disk' in resource['Attributes']:
-               disk = resource['Attributes']['Disk']
-           else:
-               disk = 20 * 1024
-           #if 'Frequency' in resource['Attributes']:
-           #    frequency = resource['Attributes']['Frequency']
-           #else:
-           #    frequency = 2.4
+                if 'Cores' in resource['Attributes']:
+                    vcpu = resource['Attributes']['Cores']
+                else:
+                    vcpu = 1
+                if 'Memory' in resource['Attributes']:
+                    memory = resource['Attributes']['Memory']
+                else:
+                    memory = 2048
+                if 'Disk' in resource['Attributes']:
+                    disk = resource['Attributes']['Disk']
+                else:
+                    disk = 20 * 1024
+
+            except Exception:
+                response.status = 500
+                error = {"message":msg,"code":response.status}
+                return error
+                logger.error(error)
+            #if 'Frequency' in resource['Attributes']:
+            #    frequency = resource['Attributes']['Frequency']
+            #else:
+            #    frequency = 2.4
            
-           Monitor = ""
-           if 'Monitor' in resource['Attributes']:
-               Monitor = resource['Attributes']['Monitor']
+            Monitor = ""
+            if 'Monitor' in resource['Attributes']:
+                Monitor = resource['Attributes']['Monitor']
 
-           #hostName = ""
+            #hostName = ""
           
-           for novah in h_list:
-               #print host_list
-               #for h in host_list['Machine']:
-                   #print novah, h
-                   #if novah == h['host_name']:
-                       # load values
-                       #if h['IP'] == IP:
-                       if novah == ID:
-                          #hostName = h['host_name']
-                          # build host for availability_zone option to target specific host
-                          host = "nova:"+novah
-                          name = "HARNESS-"+createRandomID(6)
-                          createFlavor(name,vcpu,memory,disk)
-                          headers = {'content-type': 'application/json','X-Auth-Token': token_id}
-                          # build body for nova api
-                          dobj = {"server" : {\
-                                      "name" : name,\
-                                      "imageRef" : image, \
-                                      "flavorRef" : name,\
-                                      "min_count": 1,\
-                                      "max_count": 1,\
-                                      "user_data": user_data,\
-                                      "availability_zone":host}}
-                          if CONFIG.has_option('network', 'NET_ID'):
-                            UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
-                            dobj["server"]["networks"] = [ { "uuid": UUID } ]
-                            #print "getting net UUID"
-                          elif CONFIG.has_option('network', 'UUID'):
-                            dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
-                             
-                          #print dobj
-                                                                                      
-                          data = json.dumps(dobj)
-                          #print "data before creating instance: ", data
-                          #print "Creating instance number "+str(i+1)+", name "+name
-                          print "Creating instance "+name
-                          #r = requests.post(public_url+'/servers', data, headers=headers)
-                          r = createResources(data)
-                          
-                          #print "====> ", str(r.json())
-                          #print r.json()
-                          try:
-                            ID = r.json()['server']['id']
-                            if Monitor:
-                                createMonitorInstance(ID,novah,Monitor)
-                            #print r.json()
-                          except KeyError, msg:
-                            print r.json()
-                            logger.error(r.json())
-                          #print getInstanceInfo(ID)
-                          #print ID
-                          #status = ""
-                                  #while (status != "ACTIVE") and (status !="ERROR"):
-                                  #    status = getInstanceStatus(ID)
-                                  #    print "Status of "+name+" "+status
-                          #instanceID = {"InfReservID":ID}
-                          try:
-                            reservation["Reservations"].append(ID)
-                          except UnboundLocalError:
-                            print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-              	            logger.error("Attempting to append the ID when it has not been assigned yet")
-
-                          # delete flavor
-                          deleteFlavor(name)
+            try:
+                for novah in h_list:
+                    #print host_list
+                    #for h in host_list['Machine']:
+                        #print novah, h
+                        #if novah == h['host_name']:
+                            # load values
+                            #if h['IP'] == IP:
+                            if novah == ID:
+                                #hostName = h['host_name']
+                                # build host for availability_zone option to target specific host
+                                host = "nova:"+novah
+                                name = "HARNESS-"+createRandomID(6)
+                                createFlavor(name,vcpu,memory,disk)
+                                headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+                                # build body for nova api
+                                dobj = {"server" : {\
+                                            "name" : name,\
+                                            "imageRef" : image, \
+                                            "flavorRef" : name,\
+                                            "min_count": 1,\
+                                            "max_count": 1,\
+                                            "user_data": user_data,\
+                                            "availability_zone":host}}
+                                if CONFIG.has_option('network', 'NET_ID'):
+                                    try:
+                                        UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
+                                        print UUID
+                                        if "not Found" in UUID:
+                                            raise ValueError(UUID)
+                                        
+                                        dobj["server"]["networks"] = [ { "uuid": UUID } ]
+                                    except ValueError,e:
+                                        response.status = 447
+                                        error = {"message":str(e),"code":response.status}
+                                        return error
+                                        logger.error(error)
+                                    #print "getting net UUID"
+                                elif CONFIG.has_option('network', 'UUID'):
+                                    dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
+                                 
+                                #print dobj
+                                                                                          
+                                data = json.dumps(dobj)
+                                #print "data before creating instance: ", data
+                                #print "Creating instance number "+str(i+1)+", name "+name
+                                print "Creating instance "+name
+                                #r = requests.post(public_url+'/servers', data, headers=headers)
+                                r = createResources(data)
+                              
+                                #print "====> ", str(r.json())
+                                #print r.json()
+                                try:
+                                    serverID = r.json()['server']['id']
+                                    #print "serverID",serverID
+                                    if Monitor:
+                                        createMonitorInstance(serverID,novah,Monitor)
+                                    #print r.json()
+                                except KeyError, msg:
+                                    print r.json()
+                                    logger.error(r.json())
+                                #print getInstanceInfo(ID)
+                                #print ID
+                                #status = ""
+                                        #while (status != "ACTIVE") and (status !="ERROR"):
+                                        #    status = getInstanceStatus(ID)
+                                        #    print "Status of "+name+" "+status
+                                #instanceID = {"InfReservID":ID}
+                                try:
+                                    reservation["ReservationID"].append(serverID)
+                                except UnboundLocalError:
+                                    print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
+                                    logger.error("Attempting to append the ID when it has not been assigned yet")
+                                # delete flavor
+                                deleteFlavor(name)
+                                break
+                            else:
+                                msg = "ID: "+ID+" not correct"
+                                raise ValueError(msg)
+            except ValueError, e:
+                response.status = 444
+                error = {"message":str(e),"code":response.status}
+                return error
         
         #print "before url creation"
         #url = "http://"+IP_ADDR+":"+PORT_ADDR+"/method/verifyResources"
@@ -304,9 +335,14 @@ def createReservation():
             #print "data before", reservation
             #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
+            #print reply
+
             if "false" in reply:
                 #print "found false"
                 result = {"result":{}}
+            elif "Empty" in reply:
+                msg = "No reservation made. Check your request"
+                raise ValueError(msg)
             else:
                 #print "found true"
                 result = {"result":reservation}
@@ -316,6 +352,10 @@ def createReservation():
             response.status = 400
             error = {"message":e,"code":response.status}
             return error
+        except ValueError, e:
+                response.status = 445
+                error = {"message":str(e),"code":response.status}
+                return error
 
         #print result
         #return result
@@ -324,7 +364,7 @@ def createReservation():
         return jsondata
 
     except Exception.message, e:
-        response.status = 400
+        response.status = 446
         if name:
             deleteFlavor(name)
         error = {"message":e,"code":response.status}
@@ -365,7 +405,7 @@ def releaseReservation():
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         destroyMonitoringInstance(reservations)
-        print reservations
+        #print reservations
         reply = deleteResources(reservations)
         if "DONE" in reply:
             return { "result": { } }
@@ -403,7 +443,7 @@ def releaseAllReservation():
             return { "result": reply }
     #return r
 
-        if ID in req['Reservations'] is None:            	
+        if ID in req['ReservationID'] is None:            	
             raise UnboundLocalError
     except UnboundLocalError:
         raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
@@ -552,8 +592,8 @@ def getMetrics():
             if nlines != "all":
                 try:
                     nl = int(nlines)
-                    if 'derived' in (METRICS['container']) and req['format'] == "derived":
-                        derivedMetrics = METRICS['container']['derived']
+                    #if 'derived' in (METRICS['container']) and req['format'] == "derived":
+                    #    derivedMetrics = METRICS['container']['derived']
                 except ValueError:
                     response.status = 400
                     error = {"message":"ValueError: "+nlines,"code":response.status}
@@ -655,16 +695,20 @@ def createMonitorInstance(uuid,host,reqMetrics):
     logger.info("Called")
     print "In monitorInstance"
     itype = getInstanceType(host)
-    fullhostname = host+"."+DHCP_EXTENSION
+    if DHCP_EXTENSION != "":
+        fullhostname = host+"."+DHCP_EXTENSION
+    else:
+        fullhostname = host
+
     print fullhostname,itype
-    print METRICS
+    #print METRICS
 
     if reqMetrics != "":
         #with open (template, "r") as myfile:
         #    data=myfile.read()
 
         # update uuid in template with current value
-        print "INITIAL METRICS",reqMetrics
+        #print "INITIAL METRICS",reqMetrics
         #r = json.loads(template)
         #r["uuid"] = uuid
         count = 0
@@ -678,9 +722,18 @@ def createMonitorInstance(uuid,host,reqMetrics):
 
         if itype == "docker":
             #template.update(METRICS['container'])
-            updMetrics = METRICS['container']
+            updMetrics = METRICS['docker']
             updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
-            updMetrics['instanceType'] = "container"
+            updMetrics['instanceType'] = "docker"
+
+        if itype == "LXC":
+            #template.update(METRICS['container'])
+            updMetrics = METRICS['lxc']
+            updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
+            updMetrics['instanceType'] = "lxc"
+            updMetrics['instanceName'] = getInstanceName(uuid)
+            #instanceName = getInstanceName(uuid)
+            #print "I'm in createMonitorInstance",instanceName
             
         print "itype",itype
 
@@ -688,12 +741,13 @@ def createMonitorInstance(uuid,host,reqMetrics):
         updMetrics['uuid'] = uuid
         data = json.dumps(updMetrics)
         print "UPDATED updMetrics",updMetrics
-        print "data",data
+        #print "data",data
 
 
         hresmon.addResourceStatus(uuid,fullhostname,data,"NEW")
     else:
         print "No hypervisor type found"
+
 
 def mergeRequest(reqMetrics,updMetrics):
     count = 0
@@ -723,10 +777,10 @@ def destroyMonitoringInstance(reservations):
     logger.info("Called")
     print "In destroyMonitoringInstance"
     print "reservations",reservations
-    for ID in reservations['Reservations']:
+    for ID in reservations['ReservationID']:
         print "uuid",ID
         r = hresmon.destroyAgent(ID)
-    #print r
+    print r
 
 
 def registerIRM():
@@ -803,6 +857,8 @@ def init(novaapi,tenantname,username,password,interface):
     global DHCP_EXTENSION
     if CONFIG.has_option('main', 'DHCP_EXTENSION') and CONFIG.get('main', 'DHCP_EXTENSION') != "":
         DHCP_EXTENSION = CONFIG.get('main', 'DHCP_EXTENSION')
+    else:
+        DHCP_EXTENSION = ""
 
     global METRICS
     if CONFIG.has_section('metrics'):
@@ -861,6 +917,7 @@ Copyright 2014-2015 SAP Ltd
        global CONFIG
        CONFIG = ConfigParser.RawConfigParser()
        CONFIG.read(options.config)
+       libnovaInit(options.config)
 
        print options.config
        
