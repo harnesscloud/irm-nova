@@ -765,7 +765,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
                 if name == "CPU":
                     values[0] = float(values[0])/int(nproc)
                 
-                print values
+                #print values
                 updateResourceValuesStore(name+"_"+uuid,values)
                 val = int(metrics[i]['pollMulti'])
                 pollMultiList[i] = val
