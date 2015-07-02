@@ -587,30 +587,31 @@ def getMetrics():
             req = json.load(request.body)
             #print "IN GETMETRICS, REQUEST",req
             #print "METRICS file",METRICS
-            derivedMetrics = None
-            nlines = req['lines']
-            if nlines != "all":
-                try:
-                    nl = int(nlines)
-                    #if 'derived' in (METRICS['container']) and req['format'] == "derived":
-                    #    derivedMetrics = METRICS['container']['derived']
-                except ValueError:
-                    response.status = 400
-                    error = {"message":"ValueError: "+nlines,"code":response.status}
-                    return error
-                    logger.error(error)
-            else:
-                try:
-                    if req['format'] == "derived":
-                        raise ValueError
-                except ValueError:
-                    response.status = 400
-                    e = nlines + " and " + req['format'] + " bad combination, cannot be in the same request"
-                    error = {"message":"ValueError: "+e,"code":response.status}
-                    return error
-                    logger.error(error)
+            #derivedMetrics = None
+            # nlines = req['lines']
+            # if nlines != "all":
+            #     try:
+            #         nl = int(nlines)
+            #         #if 'derived' in (METRICS['container']) and req['format'] == "derived":
+            #         #    derivedMetrics = METRICS['container']['derived']
+            #     except ValueError:
+            #         response.status = 400
+            #         error = {"message":"ValueError: "+nlines,"code":response.status}
+            #         return error
+            #         logger.error(error)
+            # else:
+            #     try:
+            #         if req['format'] == "derived":
+            #             raise ValueError
+            #     except ValueError:
+            #         response.status = 400
+            #         e = nlines + " and " + req['format'] + " bad combination, cannot be in the same request"
+            #         error = {"message":"ValueError: "+e,"code":response.status}
+            #         return error
+            #         logger.error(error)
 
-            r = hresmon.getResourceValueStore(req,derivedMetrics)
+            #r = hresmon.getResourceValueStore(req,derivedMetrics)
+            r = hresmon.getResourceValueStore(req)
             #res = r.json()
             res = r
             if "message" in res:

@@ -158,7 +158,7 @@ def createAgent():
 
         #print "metrics after", metrics
         #command = req['command']
-        print req
+        #print req
         uuid = req['uuid']
         pollTime = float(req['pollTime'])
         instanceType = req['instanceType']
@@ -301,6 +301,7 @@ def getResourceValueStore():
            logger.error("Payload was empty or incorrect. A payload must be present and correct")
         #print "MODE",MODE
         jsondata = getValuesStore(req) if MODE == "SINGLE" else getValuesStoreMulti(req)
+        #print "GETMETRIC JSONDATA",jsondata
         
     except Exception.message, e:
         response.status = 400
@@ -438,7 +439,7 @@ def getValuesStore(req):
     try:
         uuid = req['uuid']
         rformat = req['format']
-        print "getResourceValueStore request", uuid
+        #print "getResourceValueStore request", uuid
 
         tbname = "resourceValuesStore_"+uuid
         
@@ -490,7 +491,7 @@ def getValuesStore(req):
         result = {"Table exported":tbs}
     logger.info(result)
     jsondata = json.dumps(result)
-    print "JSONDATA",jsondata
+    #print "JSONDATA",jsondata
     return jsondata
 
 def getValuesStoreMulti(req):
@@ -498,10 +499,10 @@ def getValuesStoreMulti(req):
     print "In getValueStoreMulti"
     #print "req", req
     try:
-        #print req
-        uuid = req['uuid']
-        rformat = req['format']
-        nlines = req['lines']
+        #print "getValueStoreMulti PRINT req",req
+        uuid = req['ReservationID']
+        #rformat = req['format']
+        entry = req['Entry']
         #print uuid,rformat,nlines
 
         db = sqlite3.connect("hresmon.sqlite")
@@ -523,59 +524,68 @@ def getValuesStoreMulti(req):
             for tup in cur.fetchall():
                 tbheader = tbheader + tup[1] +" "
             
-            if rformat == "file":
-                location = "/tmp/"
-                tbfile = open(location+tbname, "wb")
-                tbfile.write(tbheader+"\n")
-                files.append(location+tbname)
-
-            if nlines == "all":
-                cur.execute('select * from \"'+tbname+'\"')
-            else:
-                try:
-                    # check if integer value
-                    nl = int(nlines)
-                    cur.execute('select * from (select * from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
-                except ValueError:
-                    response.status = 400
-                    error = {"message":"ValueError: "+nlines,"code":response.status}
-                    return error
-                    logger.error(error)
+            #if rformat == "file":
+            #    location = "/tmp/"
+            #    tbfile = open(location+tbname, "wb")
+            #    tbfile.write(tbheader+"\n")
+            #    files.append(location+tbname)
+            cur.execute('VACUUM')
+            
+            try:
+                # check if integer value
+                en = int(entry)
+                #print "VALUE", en
+                if en < 0:
+                #cur.execute('select rowid,* from \"'+tbname+'\"')
+                    cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY ROWID DESC LIMIT '+str(abs(en))+') order by ROWID ASC')
+                elif en > 0:
+                #cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
+                    cur.execute('select max(rowid) from \"'+tbname+'\"')
+                    [maxid] = cur.fetchone()
+                    #print "maxid",maxid
+                    cur.execute('select rowid,* from \"'+tbname+'\" WHERE ROWID BETWEEN '+str(en)+' AND '+str(maxid))
+            except ValueError:
+                response.status = 400
+                error = {"message":"ValueError: "+nlines,"code":response.status}
+                return error
+                logger.error(error)
 
             tb = cur.fetchall()
             for row in tb:
-                #print row
+                #print "row",row
                 values = ""
                 for v in range(0,len(row)):
                     values = values+'{} '.format(row[v])
+                #print "values",values
+                #if rformat == "file":
+                #    tbfile.write(values+ "\n")
+                #if rformat in ('rawdata','derived'):
+                #    tbs = tbs + values+ "\n"
+                #if rformat in ('rawdata'):
+                tbs = tbs + values+ "\n"
 
-                if rformat == "file":
-                    tbfile.write(values+ "\n")
-                if rformat in ('rawdata','derived'):
-                    tbs = tbs + values+ "\n"
-
-            if rformat == "file":
-                tbfile.close()
+            #if rformat == "file":
+            #    tbfile.close()
 
             matrix[str(METRIC)] = tbs
         
         #print "matrix 1",matrix
         db.close()
 
-        if rformat == "file":
-            result = {"Tables exported":files}
-        if rformat == "rawdata":
-            result = matrix
-        if rformat == "derived":
+        #if rformat == "file":
+        #    result = {"Tables exported":files}
+        #if rformat == "rawdata":
+        result = matrix
+        #if rformat == "derived":
             #print "check 1"
             #if 'derived' in req:
             #    derived = req['derived']
             #print "check 2"
             #print "matrix 2",matrix
-            updMatrix = calculateDerived(matrix)
-            result = updMatrix
+        #    updMatrix = calculateDerived(matrix)
+        #    result = updMatrix
 
-        print result
+        #print result
         logger.info(result)
         jsondata = json.dumps(result)
         return jsondata

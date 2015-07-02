@@ -126,24 +126,26 @@ def getUrlbyUuid(uuid):
 def destroyAllAgents():
     print "In destroyAllAgents"
 
-def getResourceValueStore(req,derivedMetrics=None):
+def getResourceValueStore(req):
     print "In getResourceValueStore"
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     result = {}
     try:
-        for uuid in req['ReservationID']:
-            print "UUID",uuid
-            url = getUrlbyUuid(uuid)
-            request = {"uuid":uuid,"format":req['format'],"lines":req['lines']}
-            if derivedMetrics:
-                request['derived'] = derivedMetrics
-            jsondata = json.dumps(request)
-            print "JSONDATA",jsondata
-            r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
-            #print r.json()
-            #updateResourceStatus (uuid,"REPORTED")
-            result[uuid] = r.json()
+        #for uuid in req['ReservationID']:
+        #uuid = req['ReservationID']
+        #print "UUID",uuid
+        url = getUrlbyUuid(req['ReservationID'])
+        #request = {"uuid":req['ReservationID'],"Entry":req['Entry']}
+        #if derivedMetrics:
+        #    request['derived'] = derivedMetrics
+        jsondata = json.dumps(req)
+        print "JSONDATA",jsondata
+        r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
+        #print r.json()
+        #updateResourceStatus (uuid,"REPORTED")
+        #result[uuid] = r.json()
+        result["Metrics"] = r.json()
         logger.info("response:"+json.dumps(result))
     except Exception.message, e:
         response.status = 400
