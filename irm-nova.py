@@ -791,8 +791,7 @@ def registerIRM():
     try:
        data = json.dumps(\
        {\
-       "Manager":"IRM",\
-       "Hostname":IP_ADDR,\
+       #"Address":IP_ADDR,\
        "Port":PORT_ADDR,\
        "Name":"IRM-NOVA"\
        })
