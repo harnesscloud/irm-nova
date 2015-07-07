@@ -572,7 +572,7 @@ def checkResources(data):
                 if not ERROR:
                     IP = []
                     # change to private to vmnet in field below
-
+                    print info
                     for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                         if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                             IP.append(private['addr'])

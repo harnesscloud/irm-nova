@@ -70,11 +70,15 @@ def updateResourceValuesStore(nuuid,values):
     tbname = "resourceValuesStore_"+nuuid
     #print "VALUES",values
     query = buildSqlInsert(len(values),tbname)
-    db = sqlite3.connect("hresmon.sqlite")
-    cur = db.cursor()
-    cur.execute(query,values)
-    db.commit()
-    db.close
+    try:
+        db = sqlite3.connect("hresmon.sqlite")
+        cur = db.cursor()
+        cur.execute(query,values)
+        db.commit()
+        db.close
+    except sqlite3.OperationalError:
+        print "OperationalError on DB"
+
     logger.info("Updating table "+tbname)
 
 # def updateResourceValuesStoreMulti(uuid,name,values):
@@ -764,22 +768,26 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
                 if "__pid__" in command:
                     command = command.replace("__pid__",pid)
 
-                values = subprocess.check_output(command, shell=True).rstrip()
-                values_decoded = values.decode('utf-8')
-                # This convert multiline to singleline
-                values_decoded = values_decoded.replace("\n"," ")
-                values = values_decoded.split(' ', len(values_decoded))
-                #print "values", values
-                name = metrics[i]['name']
-                #print name
-                if name == "CPU":
-                    values[0] = float(values[0])/int(nproc)
-                
-                #print values
-                updateResourceValuesStore(name+"_"+uuid,values)
-                val = int(metrics[i]['pollMulti'])
-                pollMultiList[i] = val
-        
+                #print "COMMAND for METRICS",command
+
+                try:
+                    values = subprocess.check_output(command, shell=True).rstrip()
+                    values_decoded = values.decode('utf-8')
+                    # This convert multiline to singleline
+                    values_decoded = values_decoded.replace("\n"," ")
+                    values = values_decoded.split(' ', len(values_decoded))
+                    #print "values", values
+                    name = metrics[i]['name']
+                    #print name
+                    if name == "CPU":
+                        values[0] = float(values[0])/int(nproc)
+                    
+                    #print values
+                    updateResourceValuesStore(name+"_"+uuid,values)
+                    val = int(metrics[i]['pollMulti'])
+                    pollMultiList[i] = val
+                except subprocess.CalledProcessError, e:
+                    print "CalledProcessError",e
         #print toBeMeasured
         #print pollMultiList
         

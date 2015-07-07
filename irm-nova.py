@@ -801,7 +801,7 @@ def registerIRM():
    
     # add here a check if that flavor name exists already and in that case return the correspondent ID
     # without trying to create a new one as it will fail
-    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/method/addManager', data, headers=headers)
+    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/addManager', data, headers=headers)
 
     logger.info("Completed!")
 
