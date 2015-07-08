@@ -56,6 +56,7 @@ def deleteResourceStatus():
 # this function creates an agent python file to a local or remote host and starts the agent
 def createAgent(data,url):
     print "In createAgent"
+    print "url",url
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     try:

@@ -324,7 +324,7 @@ def createListAvailableResources(public_url,token_id,option):
              
                  # load detail from nova reply
                 if 'host' in hostDetails:
-                    print "::::>", hostDetails['host']
+                    #print "::::>", hostDetails['host']
                     for majorkey in hostDetails['host']:
                         if majorkey['resource']['project'] == '(total)':
                             total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
@@ -573,7 +573,7 @@ def checkResources(data):
                     IP = []
                     # change to private to vmnet in field below
 
-                    print ":::::>", info
+                    #print ":::::>", info
 
                     for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                         if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):

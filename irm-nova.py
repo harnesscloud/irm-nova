@@ -190,6 +190,11 @@ def createReservation():
         h_list = getHosts()
         #print h_list
 
+        Monitor = ""
+        if 'Monitor' in req:
+            Monitor = req['Monitor']
+            print "MONITOR section",Monitor
+
         for resource in req['Allocation']:
             print "resource",resource
             # load values
@@ -234,9 +239,7 @@ def createReservation():
             #else:
             #    frequency = 2.4
            
-            Monitor = ""
-            if 'Monitor' in resource['Attributes']:
-                Monitor = resource['Attributes']['Monitor']
+            
 
             #hostName = ""
           
@@ -724,7 +727,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
         if itype == "docker":
             #template.update(METRICS['container'])
             updMetrics = METRICS['docker']
-            updMetrics = mergeRequestOptim(reqMetrics,updMetrics)
+            updMetrics = mergeRequestOptim2(reqMetrics,updMetrics)
             updMetrics['instanceType'] = "docker"
 
         if itype == "LXC":
@@ -738,7 +741,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
             
         print "itype",itype
 
-        updMetrics['pollTime'] = reqMetrics['pollTime']
+        updMetrics['PollTime'] = reqMetrics['PollTime']
         updMetrics['uuid'] = uuid
         data = json.dumps(updMetrics)
         print "UPDATED updMetrics",updMetrics
@@ -771,6 +774,32 @@ def mergeRequestOptim(reqMetrics,updMetrics):
         z = next(y for y in reqMetrics['metrics'] if x['name'] == y['name'])
         #print "COMPARING:",x['name'],z['name']
         updMetrics['metrics'][updMetrics['metrics'].index(x)]['pollMulti'] = z['pollMulti']
+
+    return updMetrics
+
+def mergeRequestOptim2(reqMetrics,updMetrics):
+    #count = 0
+    print "reqMetrics",reqMetrics
+    print "updMetrics",updMetrics
+    print "reqMetrics keys",reqMetrics['Machine'].keys()
+    print "updMetrics keys",updMetrics['metrics'].keys()
+
+    #result = {}
+    #print "dd",dd
+
+    for key in reqMetrics['Machine']:
+        #print "key",key
+        if key in updMetrics['metrics']: 
+            #result[key] = updMetrics['metrics'][key]
+            updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
+
+    #print "result",result
+    print "updMetrics", updMetrics
+
+    #for x in updMetrics['metrics']:
+    #    z = next(y for y in reqMetrics['metrics'] if x['name'] == y['name'])
+        #print "COMPARING:",x['name'],z['name']
+    #    updMetrics['metrics'][updMetrics['metrics'].index(x)]['pollMulti'] = z['pollMulti']
 
     return updMetrics
 
