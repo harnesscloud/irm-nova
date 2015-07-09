@@ -273,13 +273,10 @@ def getHostDetails(hostname):
     logger.info("Completed!")
 
 def createListAvailableResources(public_url,token_id,option):
-    # create response structure
-    
-
     logger.info("Called")
-    #resources = {option:[]}
     res = {option:{}}
     h_list = getHosts()
+    #print "h_list",h_list
 
     mem_pr = float(CONFIG.get('overcommit','MEM_PRESERVE'))
     if mem_pr < 100:
@@ -287,84 +284,43 @@ def createListAvailableResources(public_url,token_id,option):
     else:
         mem_pr = 0.1
 
-    #print "mem_pr", mem_pr
-
-    #print h_list
-    #print host_list
     # loop through all hosts
     for novah in h_list:
-        #for h in host_list['Machine']:
-            #if novah == h['host_name']:
-                #host_split = h.split()
-                # load values
-                #hostIP = h['IP']
-                ####hostName = h['host_name']
-                #costCores = h['Cost']['Cores']
-                #costMemory = h['Cost']['Memory']
-                #costDisk = h['Cost']['Disk']
-                #frequency = h['frequency']
-                #location = h['location']
-                #CRSID = location+hostIP+"/machine/"+hostName
-                
-                                 
-                #print hostName,costCores,costMemory,costDisk
-                # get details from nova
-                 
-                hostDetails = getHostDetails(novah)
-                #print hostDetails
-                nCores = 0
-                memory = 0
-                total_cpu = 0
-                used_cpu = 0
-                total_mem = 0
-                used_mem = 0
-                total_disk = 0
-                used_disk = 0
+        # get details from nova
+        hostDetails = getHostDetails(novah)
+        #print hostDetails
+        nCores = 0
+        memory = 0
+        total_cpu = 0
+        used_cpu = 0
+        total_mem = 0
+        used_mem = 0
+        total_disk = 0
+        used_disk = 0
+     
+        # load detail from nova reply
+        if 'host' in hostDetails:
+            #print "::::>", hostDetails['host']
+            for majorkey in hostDetails['host']:
+                if majorkey['resource']['project'] == '(total)':
+                    total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
+                    total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
+                    total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
+                if majorkey['resource']['project'] == '(used_now)':
+                    used_mem = majorkey['resource']['memory_mb']
+                    used_cpu = majorkey['resource']['cpu']
+                    used_disk = majorkey['resource']['disk_gb']
+                # calculate available resources
+                nCores = total_cpu - used_cpu
+                # memory is calculated 10% less than actual value to avoid commiting it all
+                memory = int(total_mem - used_mem - mem_pr * total_mem)
+                disk = total_disk - used_disk
 
-             
-                 # load detail from nova reply
-                if 'host' in hostDetails:
-                    #print "::::>", hostDetails['host']
-                    for majorkey in hostDetails['host']:
-                        if majorkey['resource']['project'] == '(total)':
-                            total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
-                            total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
-                            total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
-                        if majorkey['resource']['project'] == '(used_now)':
-                            used_mem = majorkey['resource']['memory_mb']
-                            used_cpu = majorkey['resource']['cpu']
-                            used_disk = majorkey['resource']['disk_gb']
-                        # calculate available resources
-                        nCores = total_cpu - used_cpu
-                        # memory is calculated 10% less than actual value to avoid commiting it all
-                        memory = int(total_mem - used_mem - mem_pr * total_mem)
-                        disk = total_disk - used_disk
+            res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory,"Disk":disk}}
 
-                    #print "hostName",hostName,"nCores",nCores,"memory",memory,"disk",disk
-                    # build response
-                    #jsonGetAvResOutputRes['IP'] = hostIP
-                    #jsonGetAvResOutputRes['ID'] = hostName
-                    #jsonGetAvResOutputRes['Attributes']['Cores'] = nCores
-                    #jsonGetAvResOutputRes['Attributes']['Frequency'] = frequency
-                    #jsonGetAvResOutputRes['Attributes']['Memory'] = memory
-                    #jsonGetAvResOutputRes['Attributes']['Disk'] = disk
-
-                    res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory,"Disk":disk}}
-                    
-                    #####res[option][hostName] = copy.deepcopy(jsonGetAvResOutputRes)
-                    
-                    #data = {"ID":hostName, "IP":hostIP, "Type":"Machine","Attributes":{"Cores":nCores,"Frequency":frequency,"Memory":memory,"Disk":disk}}
-                    #print "before",resources
-                    #resources[option].append(copy.deepcopy(jsonGetAvResOutputRes))
-                    #print "jsonGetAvResOutputRes",json.dumps(jsonGetAvResOutputRes)
-                    #print "data",data
-                    #resources[option].append(data)
-                    #print "after",resources
-            #r = json.dumps(resources)
     if "{'Resources': []}" in res:
         raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
         logger.error("Failed to append 'data' variable. 'Resources' variable empty")
-
      
     logger.info("Completed!")
 

@@ -234,94 +234,80 @@ def createReservation():
                 error = {"message":msg,"code":response.status}
                 return error
                 logger.error(error)
-            #if 'Frequency' in resource['Attributes']:
-            #    frequency = resource['Attributes']['Frequency']
-            #else:
-            #    frequency = 2.4
-           
-            
 
-            #hostName = ""
-          
             try:
                 for novah in h_list:
-                    #print host_list
-                    #for h in host_list['Machine']:
-                        #print novah, h
-                        #if novah == h['host_name']:
-                            # load values
-                            #if h['IP'] == IP:
-                            if novah == ID:
-                                #hostName = h['host_name']
-                                # build host for availability_zone option to target specific host
-                                host = "nova:"+novah
-                                name = "HARNESS-"+createRandomID(6)
-                                createFlavor(name,vcpu,memory,disk)
-                                headers = {'content-type': 'application/json','X-Auth-Token': token_id}
-                                # build body for nova api
-                                dobj = {"server" : {\
-                                            "name" : name,\
-                                            "imageRef" : image, \
-                                            "flavorRef" : name,\
-                                            "min_count": 1,\
-                                            "max_count": 1,\
-                                            "user_data": user_data,\
-                                            "availability_zone":host}}
-                                if CONFIG.has_option('network', 'NET_ID'):
-                                    try:
-                                        UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
-                                        print UUID
-                                        if "not Found" in UUID:
-                                            raise ValueError(UUID)
-                                        
-                                        dobj["server"]["networks"] = [ { "uuid": UUID } ]
-                                    except ValueError,e:
-                                        response.status = 447
-                                        error = {"message":str(e),"code":response.status}
-                                        return error
-                                        logger.error(error)
-                                    #print "getting net UUID"
-                                elif CONFIG.has_option('network', 'UUID'):
-                                    dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
-                                 
-                                #print dobj
-                                                                                          
-                                data = json.dumps(dobj)
-                                #print "data before creating instance: ", data
-                                #print "Creating instance number "+str(i+1)+", name "+name
-                                print "Creating instance "+name
-                                #r = requests.post(public_url+'/servers', data, headers=headers)
-                                r = createResources(data)
-                              
-                                #print "====> ", str(r.json())
-                                #print r.json()
-                                try:
-                                    serverID = r.json()['server']['id']
-                                    #print "serverID",serverID
-                                    if Monitor:
-                                        createMonitorInstance(serverID,novah,Monitor)
-                                    #print r.json()
-                                except KeyError, msg:
-                                    print r.json()
-                                    logger.error(r.json())
-                                #print getInstanceInfo(ID)
-                                #print ID
-                                #status = ""
-                                        #while (status != "ACTIVE") and (status !="ERROR"):
-                                        #    status = getInstanceStatus(ID)
-                                        #    print "Status of "+name+" "+status
-                                #instanceID = {"InfReservID":ID}
-                                try:
-                                    reservation["ReservationID"].append(serverID)
-                                except UnboundLocalError:
-                                    print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-                                    logger.error("Attempting to append the ID when it has not been assigned yet")
-                                # delete flavor
-                                deleteFlavor(name)
-                                break
-                            else:
-                                msg = "ID: "+ID+" not correct"
-                                raise ValueError(msg)
+                    if novah == ID:
+                        #hostName = h['host_name']
+                        # build host for availability_zone option to target specific host
+                        host = "nova:"+novah
+                        name = "HARNESS-"+createRandomID(6)
+                        createFlavor(name,vcpu,memory,disk)
+                        headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+                        # build body for nova api
+                        dobj = {"server" : {\
+                                    "name" : name,\
+                                    "imageRef" : image, \
+                                    "flavorRef" : name,\
+                                    "min_count": 1,\
+                                    "max_count": 1,\
+                                    "user_data": user_data,\
+                                    "availability_zone":host}}
+                        if CONFIG.has_option('network', 'NET_ID'):
+                            try:
+                                UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
+                                print UUID
+                                if "not Found" in UUID:
+                                    raise ValueError(UUID)
+                                
+                                dobj["server"]["networks"] = [ { "uuid": UUID } ]
+                            except ValueError,e:
+                                response.status = 447
+                                error = {"message":str(e),"code":response.status}
+                                return error
+                                logger.error(error)
+                            #print "getting net UUID"
+                        elif CONFIG.has_option('network', 'UUID'):
+                            dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
+                         
+                        #print dobj
+                                                                                  
+                        data = json.dumps(dobj)
+                        #print "data before creating instance: ", data
+                        #print "Creating instance number "+str(i+1)+", name "+name
+                        print "Creating instance "+name
+                        #r = requests.post(public_url+'/servers', data, headers=headers)
+                        r = createResources(data)
+                      
+                        #print "====> ", str(r.json())
+                        #print r.json()
+                        try:
+                            serverID = r.json()['server']['id']
+                            #print "serverID",serverID
+                            if Monitor:
+                                createMonitorInstance(serverID,novah,Monitor)
+                            #print r.json()
+                        except KeyError, msg:
+                            print r.json()
+                            logger.error(r.json())
+                        #print getInstanceInfo(ID)
+                        #print ID
+                        #status = ""
+                                #while (status != "ACTIVE") and (status !="ERROR"):
+                                #    status = getInstanceStatus(ID)
+                                #    print "Status of "+name+" "+status
+                        #instanceID = {"InfReservID":ID}
+                        try:
+                            reservation["ReservationID"].append(serverID)
+                        except UnboundLocalError:
+                            print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
+                            logger.error("Attempting to append the ID when it has not been assigned yet")
+                        # delete flavor
+                        deleteFlavor(name)
+                        break
+                    else:
+                        msg = "ID: "+ID+" not correct"
+                        raise ValueError(msg)
             except ValueError, e:
                 response.status = 444
                 error = {"message":str(e),"code":response.status}
@@ -425,21 +411,24 @@ def releaseReservation():
     logger.info("Completed!")
 
 # To be fixed with DELETE
-@route('/releaseAllReservation/', method='DELETE')
-@route('/releaseAllReservation', method='DELETE')
-def releaseAllReservation():
+@route('/releaseAllReservations/', method='DELETE')
+@route('/releaseAllReservations', method='DELETE')
+def releaseAllReservations():
     logger.info("Called")
     try:
         reservations = getListInstances()
-        #print reservations
+        print "reservations",reservations
     except ValueError:
         print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
         print " "
         logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
-        destroyMonitoringInstance(reservations)
-        reply = deleteResources(reservations)
-        #reply = {"DONE"}
+        if reservations['ReservationID']:
+            destroyMonitoringInstance(reservations)
+            reply = deleteResources(reservations)
+        else:
+            reply = "No reservations to release"
+        
         if "DONE" in reply:
             return { "result": { } }
         else:
@@ -465,9 +454,9 @@ def releaseAllReservation():
 
     logger.info("Completed!")
 
-@route('/computeCapacity/', method='POST')
-@route('/computeCapacity', method='POST')
-def computeCapacity():
+@route('/calculateCapacity/', method='POST')
+@route('/calculateCapacity', method='POST')
+def calculateCapacity():
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -635,63 +624,6 @@ def getMetrics():
         return error
         logger.error(error)   
     logger.info("Completed!")
-
-# @route('/method/calculateResourceAgg/', method='POST')
-# @route('/method/calculateResourceAgg', method='POST')
-# def calculateResourceAgg():
-#     response.set_header('Content-Type', 'application/json')
-#     response.set_header('Accept', '*/*')
-#     response.set_header('Allow', 'POST, HEAD')
-#     logger.info("Called")
-#     try:
-#         try:
-#             # get the body request
-#             req = json.load(request.body)
-#         except ValueError: 
-#         	print 'N-Irm: [calculateResourceAgg] Attempting to load a non-existent payload, please enter desired layout'
-#         	print ' '
-#         	logger.error("Payload was empty or incorrect. A payload must be present and correct")
-#         # loop through all requested resources
-#         totCores = 0
-#         totMem = 0
-#         maxFreq = 0
-#         totDisk = 0
-#         rType = req['Resources'][0]['Type']
-#         #rType = 'machine' 
-
-#         for majorkey in req['Resources']:
-#            try: totCores = totCores + majorkey['Attributes']['Cores']
-#            except KeyError:
-#               print "N-Irm [calculateResourceAgg] failed to assign totCores in 'Resources'. Possible payload spelling error"
-#               logger.error("Failure to assign totCores within 'Resources. Potential spelling error'") 
-#               raise KeyError
-#            try: totMem = totMem + majorkey['Attributes']['Memory']
-#            except KeyError: 
-#               print "N-Irm [calculateResourceAgg] failed to assign totMem in 'Resources'. Possible payload spelling error" 
-#               logger.error("Failure to assign totMem within 'Resources. Potential spelling error'")               
-#               raise KeyError
-#            try: totDisk = totDisk + majorkey['Attributes']['Disk']
-#            except KeyError: 
-#               print "N-Irm [calculateResourceAgg] failed to assign totDisk in 'Resources'. Possible payload spelling error" 
-#               logger.error("Failure to assign totDisk within 'Resources. Potential spelling error'")
-#               raise KeyError
-#            try:
-#                if maxFreq < majorkey['Attributes']['Frequency']:
-#                    maxFreq = majorkey['Attributes']['Frequency']
-#            except KeyError: pass
-#         #print totCores,maxFreq,totMem,totDisk
-
-#         reply = {"Type":rType,"Attributes":{"Cores":totCores,"Frequency":maxFreq,"Memory":totMem,"Disk":totDisk}}
-#         result = {"result":reply}
-        
-#         jsondata = json.dumps(result)
-#         return jsondata
-#     except Exception.message, e:
-#         response.status = 400
-#         error = {"message":e,"code":response.status}
-#         return error
-#         logger.error(error)
-#     logger.info("Completed!")
 
 ################################################################# End API #######################################################################
 

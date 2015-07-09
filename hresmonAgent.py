@@ -44,7 +44,7 @@ logger.addHandler(handler)
 
 def createResourceValuesStore(uuid,metrics):
     query = buildSqlCreateSingle(metrics,uuid)
-    print query
+    #print query
     db = sqlite3.connect("hresmon.sqlite")
     cur = db.cursor()
     tbname = "resourceValuesStore_"+uuid
@@ -54,10 +54,10 @@ def createResourceValuesStore(uuid,metrics):
     logger.info("Created table "+tbname)
 
 def createResourceValuesStoreMulti(uuid,metrics):
-    print "metrics in createResourceValuesStoreMulti",metrics
+    #print "metrics in createResourceValuesStoreMulti",metrics
     db = sqlite3.connect("hresmon.sqlite")
     for key in metrics:
-        print "key and value",key,metrics[key]
+        #print "key and value",key,metrics[key]
         #if m['name'] != "TIMESTAMP":
         query = buildSqlCreateMulti(key,metrics[key],uuid)
         cur = db.cursor()
@@ -105,7 +105,7 @@ def buildSqlCreateSingle(metrics,uuid):
     return query
 
 def buildSqlCreateMulti(key,value,uuid):
-    print "metrics in buildSqlCreateMulti",key,value
+    #print "metrics in buildSqlCreateMulti",key,value
     tbname = "resourceValuesStore_"+key+"_"+uuid
     #columns = ""
     columns ="\"TIMESTAMP\" FLOAT, \""+key+"\" "+value['type']
@@ -169,7 +169,7 @@ def createAgent():
         pollTime = float(req['PollTime'])
         instanceType = req['instanceType']
         
-        print "metrics, uuid, pollTime",metrics,uuid,pollTime
+        #print "metrics, uuid, pollTime",metrics,uuid,pollTime
 
         print "instanceType", instanceType
         # check if the pid exists
@@ -183,7 +183,7 @@ def createAgent():
             pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
             pid = getPid(uuid,pidCmd)
         
-        print "pid",pid
+        #print "pid",pid
          
         if pid == "":
             msg = "No process existing for Agent "+uuid
@@ -393,42 +393,42 @@ def getValuesStoreMulti(req):
 
         db = sqlite3.connect("hresmon.sqlite")
         cur = db.cursor()
+        cur.execute('VACUUM')
+
         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
         cur.execute(sqlGetTablesByuuid)
         tables = [str(table[0]) for table in cur.fetchall()]
         #print tables
         matrix = {}
         files = []
+        maxid = getMinMaxID(tables,uuid)
 
         for tbname in tables:
-            tbheader = ""
             tbs = ""
             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
             #print "tbname",tbname
 
-            cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
-            for tup in cur.fetchall():
-                tbheader = tbheader + tup[1] +" "
+            #tbheader = ""
+            #cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
+            #for tup in cur.fetchall():
+            #    tbheader = tbheader + tup[1] +" "
             
             #if rformat == "file":
             #    location = "/tmp/"
             #    tbfile = open(location+tbname, "wb")
             #    tbfile.write(tbheader+"\n")
             #    files.append(location+tbname)
-            cur.execute('VACUUM')
+            
             
             try:
                 # check if integer value
                 en = int(entry)
                 #print "VALUE", en
                 if en < 0:
-                #cur.execute('select rowid,* from \"'+tbname+'\"')
+                    #cur.execute('select rowid,* from \"'+tbname+'\"')
                     cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY ROWID DESC LIMIT '+str(abs(en))+') order by ROWID ASC')
                 elif en > 0:
-                #cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
-                    cur.execute('select max(rowid) from \"'+tbname+'\"')
-                    [maxid] = cur.fetchone()
-                    #print "maxid",maxid
+                    #cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
                     cur.execute('select rowid,* from \"'+tbname+'\" WHERE ROWID BETWEEN '+str(en)+' AND '+str(maxid))
             except ValueError:
                 response.status = 400
@@ -487,6 +487,22 @@ def getValuesStoreMulti(req):
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+
+def getMinMaxID(tables,uuid):
+    db = sqlite3.connect("hresmon.sqlite")
+    cur = db.cursor()
+    maxidList = []
+    for tbname in tables:
+        METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
+        cur.execute('select max(rowid) from \"'+tbname+'\"')
+        [maxid] = cur.fetchone()
+        maxidList.append(maxid)
+        
+    db.close()
+    minMaxID = min(maxidList)
+    #print "minMaxID",minMaxID
+
+    return minMaxID
 
 def calculateDerived(matrix):
     logger.info("Called")
@@ -687,12 +703,12 @@ def runAgentMulti2(pollTime,uuid,metrics,pid):
     #print commandTimestamp
     
     pollMultiList = [int(metrics[m]['PollTimeMultiplier']) for m in metrics]
-    print "pollMultiList",pollMultiList
+    #print "pollMultiList",pollMultiList
 
     while True:
         try:
             toBeMeasured = [x for x,y in enumerate(pollMultiList) if y == 1]
-            print toBeMeasured
+            #print toBeMeasured
         except ValueError:
             print "List does not contain value 1"
         #if some of the pollMulti has reached 1
@@ -701,7 +717,7 @@ def runAgentMulti2(pollTime,uuid,metrics,pid):
         if len(toBeMeasured) > 0:
             for i in toBeMeasured:
                 key = metrics.keys()[i]
-                print "metrics.keys()",key
+                #print "metrics.keys()",key
                 command = commandTimestamp+";"+metrics[key]['command']
                 if "__pid__" in command:
                     command = command.replace("__pid__",pid)
