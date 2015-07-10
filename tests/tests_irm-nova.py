@@ -56,11 +56,15 @@ def apiTest(url,verb="POST",data=None):
         elif verb == "DELETE":
             r = requests.delete(url, data=data, headers=headers)
         result = r.text
-        #print result
+        if r.raise_for_status():
+            raise requests.exceptions.HTTPError("Erro in response status")
+        #print "And you get an HTTPError:", e.message
+        #error = {"message":e.message,"code":404}
+        #return error
     except Exception.message, e:
-       response.status = 400
-       error = {"message":e,"code":response.status}
-       return error
+        #response.status = 400
+        error = {"message":e,"code":400}
+        return error
 
     return result
 
@@ -71,7 +75,7 @@ def testAPI():
     for api in apiList:
         url = irm_nova_url+api
         error = None
-        print "api:",api
+        #print "api:",api
     
         try:
             if "createReservation" in api:
@@ -85,17 +89,18 @@ def testAPI():
                 if not json.loads(response)['result']['Instances']:
                     error = "Data empty"
             elif "getMetrics" in api:
-                print "getMetrics test",decoded['ReservationID'][0]
-                time.sleep(5)
+                #print "getMetrics test",decoded['ReservationID'][0]
+                time.sleep(10)
                 data = {"ReservationID":decoded['ReservationID'][0],"Entry":1}
-                response = apiTest(url,"POST",data)
+                #print "getMetrics data:",data
+                response = apiTest(url,"POST",json.dumps(data))
             elif "releaseReservation" in api:
                 # need to wait to give time the spawned instance to be active before deleting it
                 time.sleep(5)
                 response = apiTest(url,"DELETE",json.dumps(decoded))
             elif "releaseAllReservations" in api:
                 # Need to do another reservation to test this API
-                print "in releaseAllReservations"
+                #print "in releaseAllReservations"
                 response = apiTest(irm_nova_url+"/createReservation","POST",jsonReserveRes)
                 #decoded = json.loads(response)['result']
                 #print decoded
@@ -103,24 +108,41 @@ def testAPI():
                 time.sleep(5)
                 response = apiTest(url,"DELETE",None)
             elif "calculateCapacity" in api:
-                response = apiTest(url,"POST",jsonCalcResCap)
+                data = json.loads(jsonCalcResCap)['Input']
+                #print "json.loads(jsonCalcResCap)['Input']",data
+                out = json.loads(jsonCalcResCap)['Output']
+                #print "json.loads(jsonCalcResCap)['Output']",out
+
+                response = apiTest(url,"POST",json.dumps(data))
+                #print "calculateCapacity response",response
+
+                res = json.loads(response)
+
+                if res != out:
+                    print "WARNING: BAD calculateCapacity Output"
+                    error = "BAD"
+
 #            elif "calculateResourceAgg" in api:
 #                response = apiTest(url,"POST",jsonCalcResAgg)
             elif "getResources" or "getAllocSpec" in api:
                 response = apiTest(url,"GET",None)
             else:
-                print "default api call"
+                #print "default api call"
                 response = apiTest(url)
         except Exception.message, e:
             response.status = 400
             error = {"message":e,"code":response.status}
+            pass
+        except requests.exceptions.HTTPError as e:
+            print e
+            error = {"message":e.message,"code":404}
 
         if is_json(response) and error == None:
-            PASSED = "PASSED"
+            STATUS = "PASSED"
         else:
-            PASSED = "FAILED"
+            STATUS = "FAILED"
     
-        print "API call",api,PASSED
+        print "API call",api,STATUS
 
 testAPI()
 

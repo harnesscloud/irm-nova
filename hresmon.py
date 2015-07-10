@@ -56,12 +56,12 @@ def deleteResourceStatus():
 # this function creates an agent python file to a local or remote host and starts the agent
 def createAgent(data,url):
     print "In createAgent"
-    print "url",url
+    #print "url",url
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     try:
         r = requests.post('http://'+url+':12000/createAgent', data, headers=headers)
-        print "url",url
+        #print "url",url
         logger.info("response:"+json.dumps(r.json()))
     except Exception.message, e:
         response.status = 400
@@ -86,8 +86,8 @@ def destroyAgent(uuid):
         if url != "":
             data = {"uuid":uuid}
             jsondata = json.dumps(data)
-            print jsondata
-            print "url",url
+            #print jsondata
+            #print "url",url
             r = requests.delete('http://'+url+':12000/terminateAgent', data=jsondata, headers=headers)
             updateResourceStatus (uuid,"ENDED")
             logger.info("response:"+json.dumps(r.json()))
@@ -141,7 +141,7 @@ def getResourceValueStore(req):
         #if derivedMetrics:
         #    request['derived'] = derivedMetrics
         jsondata = json.dumps(req)
-        print "JSONDATA",jsondata
+        #print "JSONDATA",jsondata
         r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
         #print r.json()
         #updateResourceStatus (uuid,"REPORTED")

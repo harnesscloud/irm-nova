@@ -193,10 +193,10 @@ def createReservation():
         Monitor = ""
         if 'Monitor' in req:
             Monitor = req['Monitor']
-            print "MONITOR section",Monitor
+            #print "MONITOR section",Monitor
 
         for resource in req['Allocation']:
-            print "resource",resource
+            #print "resource",resource
             # load values
             #IP = resource['IP']
             ID = resource['ID']
@@ -256,7 +256,7 @@ def createReservation():
                         if CONFIG.has_option('network', 'NET_ID'):
                             try:
                                 UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
-                                print UUID
+                                #print UUID
                                 if "not Found" in UUID:
                                     raise ValueError(UUID)
                                 
@@ -636,7 +636,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
     else:
         fullhostname = host
 
-    print fullhostname,itype
+    #print fullhostname,itype
     #print METRICS
 
     if reqMetrics != "":
@@ -671,18 +671,20 @@ def createMonitorInstance(uuid,host,reqMetrics):
             #instanceName = getInstanceName(uuid)
             #print "I'm in createMonitorInstance",instanceName
             
-        print "itype",itype
+        #print "itype",itype
 
         updMetrics['PollTime'] = reqMetrics['PollTime']
         updMetrics['uuid'] = uuid
         data = json.dumps(updMetrics)
-        print "UPDATED updMetrics",updMetrics
+        #print "UPDATED updMetrics",updMetrics
         #print "data",data
 
 
         hresmon.addResourceStatus(uuid,fullhostname,data,"NEW")
     else:
         print "No hypervisor type found"
+
+    logger.info("Completed!")
 
 
 def mergeRequest(reqMetrics,updMetrics):
@@ -711,10 +713,10 @@ def mergeRequestOptim(reqMetrics,updMetrics):
 
 def mergeRequestOptim2(reqMetrics,updMetrics):
     #count = 0
-    print "reqMetrics",reqMetrics
-    print "updMetrics",updMetrics
-    print "reqMetrics keys",reqMetrics['Machine'].keys()
-    print "updMetrics keys",updMetrics['metrics'].keys()
+    #print "reqMetrics",reqMetrics
+    #print "updMetrics",updMetrics
+    #print "reqMetrics keys",reqMetrics['Machine'].keys()
+    #print "updMetrics keys",updMetrics['metrics'].keys()
 
     #result = {}
     #print "dd",dd
@@ -726,7 +728,7 @@ def mergeRequestOptim2(reqMetrics,updMetrics):
             updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
 
     #print "result",result
-    print "updMetrics", updMetrics
+    #print "updMetrics", updMetrics
 
     #for x in updMetrics['metrics']:
     #    z = next(y for y in reqMetrics['metrics'] if x['name'] == y['name'])

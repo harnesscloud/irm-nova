@@ -49,9 +49,9 @@ def getIP(url):
         logger.error("url error caused result variable to have incorrect assignment")
 
     if result:
-            return result.group()
+        return result.group()
     else:
-            return None
+        return None
     logger.info("Completed!")
 
 def createToken(os_api_url, tenantName, username, password):
@@ -70,10 +70,10 @@ def createToken(os_api_url, tenantName, username, password):
         logger.error("Fault with token_url or data variable, caused r to be unusable with json")
      
     if token_id:
-            #print token_id
-            return token_id
+        #print token_id
+        return token_id
     else:
-            return None
+        return None
     logger.info("Completed!")
 
 def getEndPoint(os_api_url, token_id):
@@ -97,10 +97,10 @@ def getEndPoint(os_api_url, token_id):
             global public_url
             public_url = majorkey['publicURL']
     if public_url:
-            print public_url
-            return public_url
+        #print public_url
+        return public_url
     else:
-            return None
+        return None
     logger.info("Completed!")
 
 
@@ -114,7 +114,7 @@ def getHosts():
 
     headers = {'X-Auth-Token': token_id}
      #headers = None
-    print public_url
+    #print public_url
      #print token_id
     r = requests.get(public_url+'/os-hosts', headers=headers)
      
@@ -288,6 +288,7 @@ def createListAvailableResources(public_url,token_id,option):
     for novah in h_list:
         # get details from nova
         hostDetails = getHostDetails(novah)
+        itype = getInstanceType(novah)
         #print hostDetails
         nCores = 0
         memory = 0
@@ -316,7 +317,16 @@ def createListAvailableResources(public_url,token_id,option):
                 memory = int(total_mem - used_mem - mem_pr * total_mem)
                 disk = total_disk - used_disk
 
-            res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory,"Disk":disk}}
+            
+            res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory}}
+
+            if itype not in ["docker","LXC"]:
+                #print "itype in createListAvailableResources 1",itype
+                res[option][novah]['Attributes']['Disk'] = disk
+            #else:
+                #print "itype in createListAvailableResources 2",itype
+                
+                
 
     if "{'Resources': []}" in res:
         raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
@@ -407,9 +417,9 @@ def getInstanceStatus(ID):
         print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
 
     if status:
-            return status
+        return status
     else:
-            return None
+        return None
          
     logger.info("Completed!")
 
@@ -458,9 +468,9 @@ def getNetUUIDbyName(name):
     #print "GLANCE IMAGES",r.text
     try:
         netId = ""
-        print name
+        #print name
         for net in r.json()["networks"]:
-            print net["label"]
+            #print net["label"]
             if net["label"] == name:
                 netId = net["id"]
                 break
