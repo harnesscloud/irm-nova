@@ -6,20 +6,18 @@
 #
 # Status
 # - all APIs are implemented and seem to be working
-# - loading additional info of computes not available through openstack from compute_list file
 #
 #
 #
 # How it works
 # - check the help
 #    - ./irm-nova.py -h
-#    - configuration files
-#       - general: irm.cfg
-#       - nova related: compute_list, this need to be filled with nova-compute(s) values
+#    - configuration file:
+#       - irm-*.cfg
 # - start the API
 #    - e.g. ./irm-nova.py -a 192.168.56.108:5000 -t admin -u admin -w password -i eth0 -p 8888
 #    - e.g. ./irm-nova.py -c irm.cfg
-#    - it can also be started through supervisor
+#    - it can also be started through supervisor (the startup command has to be added to supervisor.conf file)
 #         - supervisord -c ./supervisord.conf
 #
 # - test
@@ -29,12 +27,13 @@
 #    - use any rest client (e.g. RESTClient for firefox) to make calls to the API
 #
 # - available APIs
-#   - /method/getAvailableResources
-#   - /method/getResourceTypes
-#   - /method/calculateResourceCapacity
-#   - /method/verifyResources
-#   - /method/reserveResources
-#   - /method/releaseResources
+#   - /method/getResources
+#   - /method/getAllocSpec
+#   - /method/calculateCapacity
+#   - /method/checkReservation
+#   - /method/createReservation
+#   - /method/releaseReservation
+#   - /method/releaseAllReservations
 #
 #
 
@@ -45,18 +44,22 @@ import ConfigParser
 from threading import Thread
 import logging
 import logging.handlers as handlers
+import libnova
 from libnova import *
 
 #from pudb import set_trace; set_trace()
 
-#Config and format for logging messages
-logger = logging.getLogger("Rotating Log")
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
-## Logging format
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def createLogger():
+    global logger
+    #Config and format for logging messages
+    logger = logging.getLogger("Rotating Log")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+    handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
+    ## Logging format
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
 
 ######################################################## API ###################################################################
 
@@ -85,6 +88,7 @@ def getResources():
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'GET, HEAD') 
 
+    logger.info("Resources result: "+result)
     logger.info("Completed")   
     return result
     
@@ -98,8 +102,8 @@ def getAllocSpec():
             jsonGetResT = f.read()
 
         jsonGetResT = json.loads(jsonGetResT)['Output']
-        result = {"result":jsonGetResT}
-        r = json.dumps(result)
+        r = {"result":jsonGetResT}
+        result = json.dumps(r)
         
     except Exception.message, e:
         response.status = 400
@@ -111,59 +115,44 @@ def getAllocSpec():
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'GET, HEAD') 
     
-    if r:
-        return r
+    logger.info(r)
+    logger.info("Completed!")
+    if result:
+        return result
     else:
         return None
-    logger.info("Completed!")
-
 
 # To be fixed with GET
 @route('/checkReservation/', method='POST')
 @route('/checkReservation', method='POST')
 def checkReservation():
     logger.info("Called")
-    try:
-        #print ID
-        req = json.load(request.body)
-    except ValueError as e:
-        print e
-        print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload"   
-        print " "
-        logger.error("Payload was empty. A payload must be present")
-    
-    #print "in verifyResources"
-    #print reply
-    #network = getNetworks()[0]
-    #print network
-    #print "===> NETWORKS:", getNetworks()
-    try:
-    	reply = checkResources(req)
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'POST, HEAD') 
 
-        ####option = "AvailableResources"
-        ####resources = createListAvailableResources(public_url,token_id,option)
-        #print resources
-        #print reply
-        #reply["Reservations"]
-        #print reply
-        #####reply.update(resources)
-        #print reply
+    try:
+        req = json.load(request.body)
+        logger.info("Check Reservation for: "+json.dumps(req))
+    	reply = checkResources(req)
         result = {"result":reply}
-        #print result
-        #jsondata = json.dumps(result)
-        return result
     
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    except ValueError as e:
+        print e
+        print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload\n"   
+        logger.error("Payload was empty. A payload must be present")
 
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD') 
-
+    logger.info("Checked Reservation: "+json.dumps(result))
     logger.info("Completed!")
+    if result:
+        return result
+    else:
+        return None
 
 @route('/createReservation/', method='POST')
 @route('/createReservation', method='POST')
@@ -173,10 +162,9 @@ def createReservation():
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
     try:
-        # get the body request
-      #  print request.body
         try:
             req = json.load(request.body)
+            logger.info("Create Reservation for: "+json.dumps(req))
         except ValueError:
         	print "N-Irm [reserveResources] Attempting to load a non-existent payload please enter desired payload"
         	logger.error("Payload was empty or incorrect. A payload must be present and correct")
@@ -186,21 +174,16 @@ def createReservation():
         reservation = {"ReservationID":[]}
         # loop through all requested resources
         name = ""
-        #print "============> ", req['Resources']
         h_list = getHosts()
-        #print h_list
-
         Monitor = ""
+
         if 'Monitor' in req:
             Monitor = req['Monitor']
             #print "MONITOR section",Monitor
 
         for resource in req['Allocation']:
-            #print "resource",resource
-            # load values
-            #IP = resource['IP']
             ID = resource['ID']
-            #print "Image", resource['Image']
+
             try:
                 if 'Image' in resource['Attributes']:
                     image = getImageUUIDbyName(resource['Attributes']['Image'])
@@ -238,7 +221,6 @@ def createReservation():
             try:
                 for novah in h_list:
                     if novah == ID:
-                        #hostName = h['host_name']
                         # build host for availability_zone option to target specific host
                         host = "nova:"+novah
                         name = "HARNESS-"+createRandomID(6)
@@ -269,39 +251,23 @@ def createReservation():
                             #print "getting net UUID"
                         elif CONFIG.has_option('network', 'UUID'):
                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
-                         
-                        #print dobj
                                                                                   
                         data = json.dumps(dobj)
-                        #print "data before creating instance: ", data
-                        #print "Creating instance number "+str(i+1)+", name "+name
                         print "Creating instance "+name
-                        #r = requests.post(public_url+'/servers', data, headers=headers)
                         r = createResources(data)
-                      
-                        #print "====> ", str(r.json())
-                        #print r.json()
+
                         try:
                             serverID = r.json()['server']['id']
-                            #print "serverID",serverID
                             if Monitor:
                                 createMonitorInstance(serverID,novah,Monitor)
-                            #print r.json()
-                        except KeyError, msg:
-                            print r.json()
-                            logger.error(r.json())
-                        #print getInstanceInfo(ID)
-                        #print ID
-                        #status = ""
-                                #while (status != "ACTIVE") and (status !="ERROR"):
-                                #    status = getInstanceStatus(ID)
-                                #    print "Status of "+name+" "+status
-                        #instanceID = {"InfReservID":ID}
-                        try:
+                        
                             reservation["ReservationID"].append(serverID)
                         except UnboundLocalError:
                             print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
                             logger.error("Attempting to append the ID when it has not been assigned yet")
+                        except KeyError, msg:
+                            print r.json()
+                            logger.error(r.json())
                         # delete flavor
                         deleteFlavor(name)
                         break
@@ -312,19 +278,9 @@ def createReservation():
                 response.status = 444
                 error = {"message":str(e),"code":response.status}
                 return error
-        
-        #print "before url creation"
-        #url = "http://"+IP_ADDR+":"+PORT_ADDR+"/method/verifyResources"
-        #data = reply
-        #print "reply before", reply
-        #headers = {'Content-Type': 'application/json'}
 
         try:
-            #print "before requests"
-            #print "data before", reservation
-            #r = requests.post(url, data, headers=headers)
             reply = checkResources(reservation)
-            #print reply
 
             if "false" in reply:
                 #print "found false"
@@ -335,8 +291,6 @@ def createReservation():
             else:
                 #print "found true"
                 result = {"result":reservation}
-            #print "after requests"
-            #result = r.text
         except Exception.message, e:
             response.status = 400
             error = {"message":e,"code":response.status}
@@ -346,10 +300,9 @@ def createReservation():
                 error = {"message":str(e),"code":response.status}
                 return error
 
-        #print result
-        #return result
-        #result = {"result":reply}
         jsondata = json.dumps(result)
+        logger.info("Created Reservation: "+jsondata)
+        logger.info("Completed!")
         return jsondata
 
     except Exception.message, e:
@@ -360,26 +313,23 @@ def createReservation():
         return error
         logger.error(error)
 
-    logger.info("Completed!")
 
 # To be fixed with DELETE
 @route('/releaseResources/<ID>', method='DELETE')
 def releaseResources(ID):
     logger.info("Called")
     headers = {'X-Auth-Token': token_id}
-    #print headers
-    #print token_id    
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'DELETE, HEAD') 
+    
     if str(token_id) not in str(headers):
     	raise AttributeError("N-Irm: [releaseResources/<ID>] Failure to assign headers. Possibly incorrect token_id")
     	logger.error("Failed to assign headers. Possible fault in token_id")
    
     r = requests.delete(public_url+'/servers/'+ID, headers=headers)
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'DELETE, HEAD') 
-
-    return r
     logger.info("Completed!")
+    return r
 
 # To be fixed with DELETE
 @route('/releaseReservation/', method='DELETE')
@@ -388,17 +338,16 @@ def releaseReservation():
     logger.info("Called")
     try:
     	reservations = json.load(request.body)
+        logger.info("Release reservation: "+json.dumps(reservations))
     except ValueError:
-    	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
-    	print " "
+    	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout\n"
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         destroyMonitoringInstance(reservations)
-        #print reservations
         reply = deleteResources(reservations)
+        logger.info("Completed!")
         if "DONE" in reply:
             return { "result": { } }
-
         else:
             return { "result": reply }
     #return r
@@ -408,19 +357,21 @@ def releaseReservation():
         return error
         logger.error(error)
 
-    logger.info("Completed!")
-
 # To be fixed with DELETE
 @route('/releaseAllReservations/', method='DELETE')
 @route('/releaseAllReservations', method='DELETE')
 def releaseAllReservations():
     logger.info("Called")
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('Accept', '*/*')
+    response.set_header('Allow', 'DELETE, HEAD')
+
     try:
         reservations = getListInstances()
-        print "reservations",reservations
+        logger.info("Release reservations: "+json.dumps(reservations))
+        #print "reservations",reservations
     except ValueError:
-        print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
-        print " "
+        print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout\n"
         logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         if reservations['ReservationID']:
@@ -429,11 +380,11 @@ def releaseAllReservations():
         else:
             reply = "No reservations to release"
         
+        logger.info("Completed!")
         if "DONE" in reply:
             return { "result": { } }
         else:
             return { "result": reply }
-    #return r
 
         if ID in req['ReservationID'] is None:            	
             raise UnboundLocalError
@@ -441,18 +392,11 @@ def releaseAllReservations():
         raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
         return { "result": { } }
 
-
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
-    
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'DELETE, HEAD') 
-
-    logger.info("Completed!")
 
 @route('/calculateCapacity/', method='POST')
 @route('/calculateCapacity', method='POST')
@@ -464,10 +408,12 @@ def calculateCapacity():
     try:          
         # get the body request
         try:
-           req = json.load(request.body)
+            req = json.load(request.body)
+            logger.info("Calculate Capacity: "+json.dumps(req))
+
         except ValueError:
-           print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout\n"
-           logger.error("Payload was empty or incorrect. A payload must be present and correct")
+            print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout\n"
+            logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
         cores = 0
         mem = 0
@@ -497,73 +443,66 @@ def calculateCapacity():
 		           print "N-Irm [calculateResourceCapacity] failed to assign totDisk in 'Reserve'" 
 		           logger.error("totDisk could not be assigned within 'Reserve'")
 		           pass
-		        #try: 
-		        #    if maxFreq < majorkey['Attributes']['Frequency']:
-		        #        maxFreq = majorkey['Attributes']['Frequency']
-		        #except KeyError: pass
-		  # optional release     
+        
+        # optional release     
         if 'Release' in req:
-		     for majorkey in req['Release']:
-		        try:
-		           if majorkey['Attributes'].has_key('Cores'):
-		             cores = cores + majorkey['Attributes']['Cores']
-		        except KeyError: 
-		        	  print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
-		        	  logger.error("totCores could not be assigned within 'Release'")
-		        	  pass
-		        try:
-		           if majorkey['Attributes'].has_key('Memory'):
-		             mem = mem + majorkey['Attributes']['Memory']
-		        except KeyError: 
-		        	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
-		        	  logger.error("totMem could not be assigned within 'Release'") 
-		        	  pass
-		        try:
-		           if majorkey['Attributes'].has_key('Disk'):
-		             disk = disk + majorkey['Attributes']['Disk']
-		        except KeyError: 
-		        	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'" 
-		        	  logger.error("totMem could not be assigned within 'Release'")
-		        	  pass
-		        #try:
-		        #    if maxFreq < majorkey['Attributes']['Frequency']:
-		        #        maxFreq = majorkey['Attributes']['Frequency']
-		        #except KeyError: pass
+            for majorkey in req['Release']:
+                try:
+                    if majorkey['Attributes'].has_key('Cores'):
+                        cores = cores + majorkey['Attributes']['Cores']
+                except KeyError: 
+                    print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
+                    logger.error("totCores could not be assigned within 'Release'")
+                    pass
+                try:
+                    if majorkey['Attributes'].has_key('Memory'):
+                        mem = mem + majorkey['Attributes']['Memory']
+                except KeyError:
+                    print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
+                    logger.error("totMem could not be assigned within 'Release'") 
+                    pass
+                try:
+                    if majorkey['Attributes'].has_key('Disk'):
+                        disk = disk + majorkey['Attributes']['Disk']
+                except KeyError: 
+                    print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'" 
+                    logger.error("totMem could not be assigned within 'Release'")
+                    pass
+
         try:
             rType = req['Resource']['Type']
         except AttributeError:
         	print "Failed to assign Resource type to 'rtype'"
         	logger.error("Unable to assign Resource type to 'rtype'")
-        #print totCores,maxFreq,totMem,totDisk
         
         # only return the attributes included in 'Resource'
         attribs = req['Resource']['Attributes']
         # compute if we exceed capacity - if we do, we must return { }
         exceed_capacity = False
         if attribs.has_key("Cores"):
-           attribs["Cores"] = attribs["Cores"] + cores
-           exceed_capacity = attribs["Cores"] < 0           
+            attribs["Cores"] = attribs["Cores"] + cores
+            exceed_capacity = attribs["Cores"] < 0           
         if (not exceed_capacity) and attribs.has_key("Memory"):
-           attribs["Memory"] = attribs["Memory"] + mem          
-           exceed_capacity = attribs["Memory"] < 0                       
+            attribs["Memory"] = attribs["Memory"] + mem          
+            exceed_capacity = attribs["Memory"] < 0                       
         if (not exceed_capacity) and attribs.has_key("Disk"):
-           attribs["Disk"] = attribs["Disk"] + disk
-           exceed_capacity = attribs["Disk"] < 0                                    
+            attribs["Disk"] = attribs["Disk"] + disk
+            exceed_capacity = attribs["Disk"] < 0                                    
         if exceed_capacity:
-           reply = "Allocation cannot be satisfied"
-           result = {"Error":reply}
+            reply = "Allocation cannot be satisfied"
+            result = {"Error":reply}
         else:
-           reply = {"Resource":{"Type":rType,"Attributes":attribs}}
-           result = {"result":reply}
+            reply = {"Resource":{"Type":rType,"Attributes":attribs}}
+            result = {"result":reply}
         
         jsondata = json.dumps(result)
+        logger.info("Completed!")
         return jsondata
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)   
-    logger.info("Completed!")
 
 
 @route('/getMetrics/', method='POST')
@@ -577,6 +516,7 @@ def getMetrics():
         # get the body request
         try:
             req = json.load(request.body)
+            logger.info("getMetrics for: "+json.dumps(req))
             #print "IN GETMETRICS, REQUEST",req
             #print "METRICS file",METRICS
             #derivedMetrics = None
@@ -603,12 +543,13 @@ def getMetrics():
             #         logger.error(error)
 
             #r = hresmon.getResourceValueStore(req,derivedMetrics)
-            r = hresmon.getResourceValueStore(req)
-            #res = r.json()
-            res = r
+            res = hresmon.getResourceValueStore(req)
+            
             if "message" in res:
                 raise ValueError(res['message'])
-            return r
+
+            logger.info("Completed!")
+            return res
         except ValueError,e:
             msg = "N-Irm: Payload was empty or incorrect. A payload must be present and correct\n"
             print msg
@@ -623,12 +564,12 @@ def getMetrics():
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)   
-    logger.info("Completed!")
 
 ################################################################# End API #######################################################################
 
 def createMonitorInstance(uuid,host,reqMetrics):
     logger.info("Called")
+    logger.info("Create monitor instance for "+uuid+" in host "+host)
     print "In monitorInstance"
     itype = getInstanceType(host)
     if DHCP_EXTENSION != "":
@@ -636,17 +577,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
     else:
         fullhostname = host
 
-    #print fullhostname,itype
-    #print METRICS
-
     if reqMetrics != "":
-        #with open (template, "r") as myfile:
-        #    data=myfile.read()
-
-        # update uuid in template with current value
-        #print "INITIAL METRICS",reqMetrics
-        #r = json.loads(template)
-        #r["uuid"] = uuid
         count = 0
         
         if itype == "QEMU":
@@ -676,13 +607,10 @@ def createMonitorInstance(uuid,host,reqMetrics):
         updMetrics['PollTime'] = reqMetrics['PollTime']
         updMetrics['uuid'] = uuid
         data = json.dumps(updMetrics)
-        #print "UPDATED updMetrics",updMetrics
-        #print "data",data
-
-
         hresmon.addResourceStatus(uuid,fullhostname,data,"NEW")
     else:
         print "No hypervisor type found"
+        logger.error("No hypervisor type found")
 
     logger.info("Completed!")
 
@@ -712,14 +640,6 @@ def mergeRequestOptim(reqMetrics,updMetrics):
     return updMetrics
 
 def mergeRequestOptim2(reqMetrics,updMetrics):
-    #count = 0
-    #print "reqMetrics",reqMetrics
-    #print "updMetrics",updMetrics
-    #print "reqMetrics keys",reqMetrics['Machine'].keys()
-    #print "updMetrics keys",updMetrics['metrics'].keys()
-
-    #result = {}
-    #print "dd",dd
 
     for key in reqMetrics['Machine']:
         #print "key",key
@@ -727,25 +647,18 @@ def mergeRequestOptim2(reqMetrics,updMetrics):
             #result[key] = updMetrics['metrics'][key]
             updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
 
-    #print "result",result
-    #print "updMetrics", updMetrics
-
-    #for x in updMetrics['metrics']:
-    #    z = next(y for y in reqMetrics['metrics'] if x['name'] == y['name'])
-        #print "COMPARING:",x['name'],z['name']
-    #    updMetrics['metrics'][updMetrics['metrics'].index(x)]['pollMulti'] = z['pollMulti']
-
     return updMetrics
 
 def destroyMonitoringInstance(reservations):
     logger.info("Called")
     print "In destroyMonitoringInstance"
-    print "reservations",reservations
+    #print "reservations",reservations
     for ID in reservations['ReservationID']:
-        print "uuid",ID
+        #print "uuid",ID
+        logger.info("Destroying Agent: "+ID)
         r = hresmon.destroyAgent(ID)
-    print r
-
+    #print r
+    logger.info("Completed!")
 
 def registerIRM():
     logger.info("Called")
@@ -764,7 +677,6 @@ def registerIRM():
     # add here a check if that flavor name exists already and in that case return the correspondent ID
     # without trying to create a new one as it will fail
     r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/addManager', data, headers=headers)
-
     logger.info("Completed!")
 
 
@@ -778,6 +690,7 @@ Provided network interface returns IP adress to bind on
     #return '131.254.16.173'
 
 def startAPI(IP_ADDR,PORT_ADDR):
+    logger.info("Called")
     # check if irm already running
     command = "ps -fe | grep irm-nova.py | grep python | grep -v grep"
     proccount = subprocess.check_output(command,shell=True).count('\n')
@@ -790,10 +703,14 @@ def startAPI(IP_ADDR,PORT_ADDR):
         if CONFIG.get('CRS', 'ACTIVE') == "on":
             Thread(target=registerIRM).start()
             print 'Registration with CRS done'
+            logger.info("Registration with CRS done")
         API_HOST=run(host=IP_ADDR, port=PORT_ADDR)
+
+    logger.info("Completed!")
     return IP_ADDR
 
 def init(novaapi,tenantname,username,password,interface):
+    logger.info("Called")
     global os_api_url 
     os_api_url = "http://"+novaapi
     global token_id
@@ -828,6 +745,8 @@ def init(novaapi,tenantname,username,password,interface):
         mfile = CONFIG.get('metrics', 'METRICS')
         with open(mfile) as f:
             METRICS = json.load(f)
+
+    logger.info("Completed!")
       
  
 def default():
@@ -846,6 +765,10 @@ def default():
     
 
 def main():
+    createLogger()
+    libnova.createLogger()
+    hresmon.createLogger()
+
     usage = "Usage: %prog [option] arg"
     #paragraph of help text to print after option help
     epilog= "Copyright 2015 SAP Ltd"
@@ -931,6 +854,7 @@ Copyright 2014-2015 SAP Ltd
     try:
        init(NOVAAPI,TENANTNAME,USERNAME,PASSWORD,INTERFACE)
        print "Initialization done"
+       logger.info("Initialization done")
        startAPI(IP_ADDR,PORT_ADDR)
     except Exception, e:
        e = sys.exc_info()[1]

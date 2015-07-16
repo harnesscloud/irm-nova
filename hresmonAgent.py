@@ -34,13 +34,16 @@ MODE = "MULTI"
 commandTimestamp = "date +%s"
 myname = os.path.basename(__file__)
 
-logger = logging.getLogger("Rotating Log")
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",when="H",interval=24,backupCount=0)
-## Logging format
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def createLogger():
+    global logger
+    logger = logging.getLogger("Rotating Log")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+    handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",when="H",interval=24,backupCount=0)
+    ## Logging format
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
 
 def createResourceValuesStore(uuid,metrics):
     query = buildSqlCreateSingle(metrics,uuid)
@@ -859,6 +862,8 @@ def init(interface):
         IP_ADDR="0.0.0.0"
     
 def main():
+    createLogger()
+    
     usage = "Usage: %prog [option] arg"
     #paragraph of help text to print after option help
     epilog= "Copyright 2015 SAP Ltd"

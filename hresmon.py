@@ -26,13 +26,16 @@ import hresmonAgent
 global myname, myprocesses
 myname = os.path.basename(__file__)
 
-ogger = logging.getLogger("Rotating Log")
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",when="H",interval=24,backupCount=0)
-## Logging format
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def createLogger():
+    global logger
+    logger = logging.getLogger("Rotating Log")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+    handler = handlers.TimedRotatingFileHandler(os.path.splitext(myname)[0]+".log",when="H",interval=24,backupCount=0)
+    ## Logging format
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
 
 # This function is exposed to the IRM-NOVA which adds entry whenever a VM needs to be monitored. Essentially is creating a new request to hresmon
 def addResourceStatus(uuid,host,request,status):
@@ -197,6 +200,7 @@ def checkNewRequests():
 
 # if there is not a DB one will be created with the resource-status table
 def init():
+    createLogger()
     conn = sqlite3.connect("hresmon.sqlite")
     conn.execute('''CREATE TABLE IF NOT EXISTS resources ("uuid" TEXT PRIMARY KEY  NOT NULL  UNIQUE , "HOST" TEXT DEFAULT False, "REQUEST" TEXT NOT NULL, "status" BOOL NOT NULL  DEFAULT False)''')
     conn.close()

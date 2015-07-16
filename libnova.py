@@ -19,14 +19,17 @@ import logging
 import logging.handlers as handlers
 #from pudb import set_trace; set_trace()
 
-#Config and format for logging messages
-logger = logging.getLogger("Rotating Log")
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
-## Logging format
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def createLogger():
+    #Config and format for logging messages
+    global logger
+    logger = logging.getLogger("Rotating Log")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+    handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
+    ## Logging format
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
 
 #with open("templates/json_getAvailableResources") as f:
 #        jsonGetAvRes = f.read()
@@ -60,17 +63,22 @@ def createToken(os_api_url, tenantName, username, password):
     data = json.dumps({"auth": {"tenantName": tenantName, "passwordCredentials": {"username": username, "password": password}}})
     token_url = os_api_url+"/v2.0/tokens"
     #print "token_url: "+token_url
-    r = requests.post(token_url, data, headers=headers)
     try:
+        r = requests.post(token_url, data, headers=headers)
         global token_id
         token_id = r.json()['access']['token']['id']
         #print r.text
     except AttributeError:
         print "N-Irm: [createToken] Unable to use r variable with json. Fault with token_url, or data variables"
         logger.error("Fault with token_url or data variable, caused r to be unusable with json")
-     
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+
     if token_id:
-        #print token_id
+        logger.info("Created token: "+token_id)
         return token_id
     else:
         return None
@@ -85,12 +93,18 @@ def getEndPoint(os_api_url, token_id):
         raise AttributeError("N-Irm: [getEndPoint] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
 
-    r = requests.get(endpoints_url, headers=headers)
     try:
+        r = requests.get(endpoints_url, headers=headers)
         endpoints = r.json()['endpoints']
     except AttributeError:
         print "N-Irm [getEndPoint] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
         logger.error("Failed to assign endpoints. Possible incorrect endpoints_url or unable to access endpoints")
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
+
     # print endpoints
     for majorkey in endpoints:
         if majorkey['type'] == 'compute':
@@ -98,6 +112,7 @@ def getEndPoint(os_api_url, token_id):
             public_url = majorkey['publicURL']
     if public_url:
         #print public_url
+        logger.info("Endpoint: "+public_url)
         return public_url
     else:
         return None
@@ -107,46 +122,38 @@ def getEndPoint(os_api_url, token_id):
 # get hosts from nova and return a list
 def getHosts():
     logger.info("Called")
-    ## regex check that public url begins with http:// 
-    ## token id check that it is of the correct length [32]
-    ## general try except in the event of an unexpected error, recommending that 
-    ## they check the public url, as named urls may not have been resolved
-
     headers = {'X-Auth-Token': token_id}
-     #headers = None
-    #print public_url
-     #print token_id
-    r = requests.get(public_url+'/os-hosts', headers=headers)
-     
-     #print r.text
-    # print headers
-    #print "public url",public_url
-    # print public_url
-    #print "token id",token_id
-    # print token_id
-    #print "response",r.text
    
     if str(token_id) not in str(headers):
         raise AttributeError("N-Irm: [getHosts] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
      
     try:
+        r = requests.get(public_url+'/os-hosts', headers=headers)
         # this needs to be fixed with a more appropriate error check
         if r.json():
-            print "Request OK" 
+            print "Request OK"
+            #logger.info("Hosts: "+r.text)
     except ValueError:
         print "N-Irm: [getHosts] r = requests.get failed. Possible error with public_url or hostname"
         logger.error("Error within public_url or hostname. ")
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
     hosts = []
     for majorkey in r.json()['hosts']:
         if majorkey['service'] == 'compute':
             hosts.append(majorkey['host_name'])
+
+    logger.info("Completed!")
     if hosts:
             return hosts
     else:
             return None
-    logger.info("Completed!")
+    
 
 def getListInstances():
     logger.info("Called")
@@ -193,40 +200,12 @@ def getInstanceInfo(ID):
         logger.error("Failed to assign headers. Possible fault in token_id")
     
     r = requests.get(public_url+'/servers/'+ID, headers=headers)
-
-    #response.set_header('Content-Type', 'application/json')
-    #response.set_header('Accept', '*/*')
-    #response.set_header('Allow', 'POST, HEAD')
-    #print r.json()
-    #print r.json()['server']['id']
-    #status = r.json()['server']['status']
+    logger.info("Info for instance: "+ID)
+    logger.info("Completed!")
     if r:
             return r.json()
     else:
             return None
-    logger.info("Completed!")
-
-#@route('/method/verifyResources/<ID>', method='GET')
-#def verifyResources(ID):
-    ##headers = {'X-Auth-Token': token_id}
-    ##r = requests.get(public_url+'/servers/'+ID, headers=headers)
-    ##print r.json()['server']['id']
-    ##status = getInstanceStatus(ID)
-    #info = getInstanceInfo(ID)
-    #status = info['server']['status']
-    #IP = "100"
-    #for private in info['server']['addresses']['private']:
-        #if private['OS-EXT-IPS:type'] == "fixed":
-            #IP = private['addr']
-    ##status = r.json()['server']['status']
-    #response.set_header('Content-Type', 'application/json')
-    #response.set_header('Accept', '*/*')
-    #response.set_header('Allow', 'POST, HEAD')
-    #data = {"result":{"Ready":status,"addresses":IP}}
-    #if data:
-         #return data
-    #else:
-         #return None
 
 # load resources information not available through nova from file in JSON format
 def loadHostList():
@@ -256,21 +235,27 @@ def getHostDetails(hostname):
         raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
 
-    r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
-    #print r
     try:
+        r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
         hostDetails = r.json()
+        logger.info("Host Details: "+json.dumps(hostDetails))
     except ValueError:
         print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
         print ""
         logger.error("Error within public_url or hostname")
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
     #print hostDetails    
     
+    logger.info("Completed!")
     if hostDetails:
        return hostDetails
     else:
        return None
-    logger.info("Completed!")
+    
 
 def createListAvailableResources(public_url,token_id,option):
     logger.info("Called")
@@ -416,12 +401,11 @@ def getInstanceStatus(ID):
     except TypeError:
         print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
 
+    logger.info("Completed!")
     if status:
         return status
     else:
         return None
-         
-    logger.info("Completed!")
 
 def getImageUUIDbyName(name):
     logger.info("Called")
@@ -431,15 +415,10 @@ def getImageUUIDbyName(name):
         raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
     
-    #print name
-    #print "public_url:",public_url
     r = requests.get(public_url+'/images', headers=headers)
-    #print "GLANCE IMAGES",r.text
 
     try:
         imageId=""
-        #print name
-        #print r.json()["images"]
         for image in r.json()["images"]:
             if image["name"] == name:
                 imageId = image["id"]
@@ -453,6 +432,7 @@ def getImageUUIDbyName(name):
         return error
         logger.error(error)
 
+    logger.info("Completed!")
     return imageId
 
 def getNetUUIDbyName(name):
@@ -463,14 +443,11 @@ def getNetUUIDbyName(name):
         raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
     
-    #print "public_url:",public_url
     r = requests.get(public_url+'/os-networks', headers=headers)
-    #print "GLANCE IMAGES",r.text
+
     try:
         netId = ""
-        #print name
         for net in r.json()["networks"]:
-            #print net["label"]
             if net["label"] == name:
                 netId = net["id"]
                 break
@@ -482,6 +459,7 @@ def getNetUUIDbyName(name):
         return error
         logger.error(error)
 
+    logger.info("Completed!")
     return netId
 
 
@@ -494,21 +472,18 @@ def getNetworks():
         logger.error("Failed to assign headers. Possible fault in token_id")
     
     r = requests.get(public_url+'/os-networks', headers=headers)
-    #print r.json()
     networks = []
     for net in r.json()['networks']:
             networks.append(net['label'])
 
+    logger.info("Completed!")
     if len(networks) > 0:
             return networks
     else:
             return None
-    logger.info("Completed!")
 
 def checkResources(data):
     logger.info("Called")
-    #print "data in checkResources before",data
-    
     
     reply = {"Instances":[]}
     if data['ReservationID']:
@@ -524,9 +499,10 @@ def checkResources(data):
                     while osstatus == "BUILD":
                         info = getInstanceInfo(ID)
                         osstatus = info['server']['status']
-                        #print osstatus
+                        logger.info("Status: "+osstatus)
                     if osstatus == "ACTIVE":
                         status = "true"
+                        logger.info("Status: "+osstatus)
                         #print "setting status"
 
                 except TypeError:
@@ -539,16 +515,11 @@ def checkResources(data):
                     IP = []
                     # change to private to vmnet in field below
 
-                    #print ":::::>", info
-
                     for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                         if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                             IP.append(private['addr'])
                             #print "IP:", IP
-                    #status = r.json()['server']['status']
-                    #response.set_header('Content-Type', 'application/json')
-                    #response.set_header('Accept', '*/*')
-                    #response.set_header('Allow', 'POST, HEAD')
+
                     data = {ID:{"Ready":status,"Address":IP}}
                     reply["Instances"].append(data)
             # When there is no ID, this case occurs    
@@ -562,9 +533,8 @@ def checkResources(data):
         print "Data empty"
         reply = "Empty"
 
-    #print "reply in checkResources after",reply
-    return reply
     logger.info("Completed!")
+    return reply
 
 def deleteResources(reservations):
     logger.info("Called")
@@ -582,6 +552,7 @@ def deleteResources(reservations):
                 raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
                 logger.error("Payload was incorrect. ID possibly missing or incorrect")
         # Thrown to enforce exception below
+        logger.info("Completed!")
         return "DONE"
         if ID in reservations['ReservationID'] is None:               
             raise UnboundLocalError
@@ -615,33 +586,14 @@ def getInstanceName(uuid):
             logger.error("Failed to assign headers. Possible fault in token_id")
         
         r = requests.get(public_url+'/servers/'+uuid, headers=headers)
-        
         result = r.json()
-        #print "result server keys",result["server"].keys()
-        #print "SERVER DETAILS",result["server"]["id"]
-        #print "SERVER DETAILS",result["server"]["OS-EXT-SRV-ATTR:instance_name"]
         instanceName = result["server"]["OS-EXT-SRV-ATTR:instance_name"]
     except AttributeError:
         print "N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id"
         logger.error("Failed to assign headers. Possible fault in token_id")
 
-    #instanceName = result['server']['OS-EXT-SRV-ATTR: instance_name']
-    
-    #print "getInstanceName",instanceName
-
-    return instanceName
-    #for h in result['hypervisors']:
-    #    if h['service']['host'] == host:
-    #        htype = h['hypervisor_type']
-    #        break
-
-    #return htype
-    #if len(networks) > 0:
-    #        return networks
-    #else:
-    #        return None
     logger.info("Completed!")
-
+    return instanceName
 
 def getInstanceType(host):
     logger.info("Called")
@@ -651,18 +603,21 @@ def getInstanceType(host):
         raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
     
-    r = requests.get(public_url+'/os-hypervisors/detail', headers=headers)
-    #print r.json()
-    htype = ""
-    result = r.json()
-    for h in result['hypervisors']:
-        if h['service']['host'] == host:
-            htype = h['hypervisor_type']
-            break
+    try:
+        r = requests.get(public_url+'/os-hypervisors/detail', headers=headers)
+        #print r.json()
+        htype = ""
+        result = r.json()
+        for h in result['hypervisors']:
+            if h['service']['host'] == host:
+                htype = h['hypervisor_type']
+                break
+    except Exception.message, e:
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        return error
+        logger.error(error)
 
-    return htype
-    #if len(networks) > 0:
-    #        return networks
-    #else:
-    #        return None
+    logger.info("Instance Type: "+htype)
     logger.info("Completed!")
+    return htype
