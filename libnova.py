@@ -31,11 +31,6 @@ def createLogger():
     if not logger.handlers:
         logger.addHandler(handler)
 
-#with open("templates/json_getAvailableResources") as f:
-#        jsonGetAvRes = f.read()
-
-#jsonGetAvResOutputRes = json.loads(jsonGetAvRes)['Output']['Resources'][0]
-
 def libnovaInit(conf_file):
     global CONFIG
     if 'CONFIG' not in globals():
@@ -74,8 +69,8 @@ def createToken(os_api_url, tenantName, username, password):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     if token_id:
         logger.info("Created token: "+token_id)
@@ -102,8 +97,8 @@ def getEndPoint(os_api_url, token_id):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     # print endpoints
     for majorkey in endpoints:
@@ -140,8 +135,8 @@ def getHosts():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     hosts = []
     for majorkey in r.json()['hosts']:
@@ -150,9 +145,9 @@ def getHosts():
 
     logger.info("Completed!")
     if hosts:
-            return hosts
+        return hosts
     else:
-            return None
+        return None
     
 
 def getListInstances():
@@ -203,9 +198,9 @@ def getInstanceInfo(ID):
     logger.info("Info for instance: "+ID)
     logger.info("Completed!")
     if r:
-            return r.json()
+        return r.json()
     else:
-            return None
+        return None
 
 # load resources information not available through nova from file in JSON format
 def loadHostList():
@@ -221,9 +216,9 @@ def loadHostList():
             f.close()
 
      if hosts:
-            return hosts
+        return hosts
      else:
-            return None
+        return None
      logger.info("Completed!")
 
 
@@ -246,8 +241,8 @@ def getHostDetails(hostname):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     #print hostDetails    
     
     logger.info("Completed!")
@@ -370,13 +365,13 @@ def cleanFlavors():
     except ValueError:
         error = {"message":"ValueError","code":"500"}
         print error
-        return error
         logger.error(error)
+        return error
     except requests.exceptions.RequestException:
         error = {"message":"RequestException","code":"500"}
         print error
-        return error
         logger.error(error)
+        return error
 
     logger.info("Completed!")
 
@@ -429,8 +424,8 @@ def getImageUUIDbyName(name):
     except Exception.message, e:
         response.status = 500
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     logger.info("Completed!")
     return imageId
@@ -456,8 +451,8 @@ def getNetUUIDbyName(name):
     except Exception.message, e:
         response.status = 500
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     logger.info("Completed!")
     return netId
@@ -474,13 +469,13 @@ def getNetworks():
     r = requests.get(public_url+'/os-networks', headers=headers)
     networks = []
     for net in r.json()['networks']:
-            networks.append(net['label'])
+        networks.append(net['label'])
 
     logger.info("Completed!")
     if len(networks) > 0:
-            return networks
+        return networks
     else:
-            return None
+        return None
 
 def checkResources(data):
     logger.info("Called")
@@ -569,8 +564,8 @@ def createResources(data):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     logger.info("Completed!")
     return r
 
@@ -605,7 +600,6 @@ def getInstanceType(host):
     
     try:
         r = requests.get(public_url+'/os-hypervisors/detail', headers=headers)
-        #print r.json()
         htype = ""
         result = r.json()
         for h in result['hypervisors']:
@@ -615,8 +609,8 @@ def getInstanceType(host):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
     logger.info("Instance Type: "+htype)
     logger.info("Completed!")

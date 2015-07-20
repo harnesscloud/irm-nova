@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # Description
-# This is the monitoring agent that is used to collect resource usage information for a specific VM. For each new VM, this agent is copied over to a host and started.
-# A local DB is then created with a resourceValuesStore table. When the VM has ended is lifecyle, the irm-nova will request the stats
-# for that VM. This will start a dedicated thread to analyse calculate the stats from the table
+# This is the monitoring agent that is used to collect resource usage information for a specific instance (VM or container). For each new instance, this agent is copied over to a compute node and started.
+# A local DB is then created with a resourceValuesStore table. Raw data measurements can be requesed through irm-nova that in turn contacts the right agent-thread
 #
 # 
 #
 # Status
-# - functions to be implemented
+# - all implemented
 #
 #
 #
@@ -20,15 +19,12 @@ from bottle import route, run,response,request,re
 import logging
 import logging.handlers as handlers
 
-# This variable can assume values: RUNNING, NOTRUNNING
-#global STATUS
-#STATUS = "NOTRUNNING"
-
-global myname, myprocesses, commandTimestamp, MODE
+global myname, myprocesses, commandTimestamp, MODE, hresmonDbName
 
 # MODE can be MULTI or SINGLE. The former allows specify different poll time for each metric, 
 # while the latter use the same poll time for all metrics
  
+hresmonDbName = "hresmon.sqlite"
 MODE = "MULTI"
 
 commandTimestamp = "date +%s"
@@ -46,42 +42,57 @@ def createLogger():
         logger.addHandler(handler)
 
 def createResourceValuesStore(uuid,metrics):
-    query = buildSqlCreateSingle(metrics,uuid)
-    #print query
-    db = sqlite3.connect("hresmon.sqlite")
-    cur = db.cursor()
-    tbname = "resourceValuesStore_"+uuid
-    cur.execute(query)
-    db.commit()
-    db.close
-    logger.info("Created table "+tbname)
-
-def createResourceValuesStoreMulti(uuid,metrics):
-    #print "metrics in createResourceValuesStoreMulti",metrics
-    db = sqlite3.connect("hresmon.sqlite")
-    for key in metrics:
-        #print "key and value",key,metrics[key]
-        #if m['name'] != "TIMESTAMP":
-        query = buildSqlCreateMulti(key,metrics[key],uuid)
+    try:
+        query = buildSqlCreateSingle(metrics,uuid)
+        #print query
+        db = sqlite3.connect(hresmonDbName)
         cur = db.cursor()
-        tbname = "resourceValuesStore_"+key+"_"+uuid
+        tbname = "resourceValuesStore_"+uuid
         cur.execute(query)
         db.commit()
+        db.close
         logger.info("Created table "+tbname)
-    db.close
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
+
+def createResourceValuesStoreMulti(uuid,metrics):
+    try:
+        db = sqlite3.connect(hresmonDbName)
+        for key in metrics:
+            #print "key and value",key,metrics[key]
+            #if m['name'] != "TIMESTAMP":
+            query = buildSqlCreateMulti(key,metrics[key],uuid)
+            cur = db.cursor()
+            tbname = "resourceValuesStore_"+key+"_"+uuid
+            cur.execute(query)
+            db.commit()
+            logger.info("Created table "+tbname)
+        db.close
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
 def updateResourceValuesStore(nuuid,values):
     tbname = "resourceValuesStore_"+nuuid
     #print "VALUES",values
+    #print "name",nuuid
     query = buildSqlInsert(len(values),tbname)
+    #print "query",query
     try:
-        db = sqlite3.connect("hresmon.sqlite")
+        db = sqlite3.connect(hresmonDbName)
         cur = db.cursor()
         cur.execute(query,values)
         db.commit()
         db.close
     except sqlite3.OperationalError:
         print "OperationalError on DB"
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
     logger.info("Updating table "+tbname)
 
@@ -97,10 +108,8 @@ def updateResourceValuesStore(nuuid,values):
 
 def buildSqlCreateSingle(metrics,uuid):
     tbname = "resourceValuesStore_"+uuid
-    #columns = ""
     columns = "\"TIMESTAMP\" FLOAT, "
     for m in metrics:
-        #print "In buildSqlCreate",m
         columns = columns+"\""+m['name']+"\" "+m['type']+","
 
     columns = columns[:-1]
@@ -108,27 +117,18 @@ def buildSqlCreateSingle(metrics,uuid):
     return query
 
 def buildSqlCreateMulti(key,value,uuid):
-    #print "metrics in buildSqlCreateMulti",key,value
     tbname = "resourceValuesStore_"+key+"_"+uuid
-    #columns = ""
     columns ="\"TIMESTAMP\" FLOAT, \""+key+"\" "+value['type']
-
-    #columns = columns[:-1]
-
     query = "CREATE TABLE IF NOT EXISTS \""+tbname+"\" ("+columns+")"
     return query
 
 def buildSqlInsert(nvalues,tbname):
-    #tbname = "resourceValuesStore_"+uuid
     columns = ""
     for i in range(0,nvalues):
         columns = columns+"?,"
 
     columns = columns[:-1]
-
     query = "INSERT INTO \""+tbname+"\" VALUES ("+columns+")"
-    #print query
-
     return query
 
 def buildCommand(metrics):
@@ -138,56 +138,32 @@ def buildCommand(metrics):
 
     return command
 
-# this will be moved in the agent code
-def deleteResourceValuesStore():
-    print "In deleteResourceValuesStore"
-
 # this function creates an agent python file to a local or remote host and starts the agent
 @route('/createAgent/', method='POST')
 @route('/createAgent', method='POST')
 def createAgent():
+    logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
-    #print "multiprocessing.active_children()", multiprocessing.active_children()
     try:          
         # get the body request
-        try:
-           req = json.load(request.body)
-           #print req
-        except Exception.message, e:
-           print "Attempting to load a non-existent payload, please enter desired layout\n"
-           logger.error("Payload was empty or incorrect. A payload must be present and correct")
-           return error
-
+        req = json.load(request.body)
         metrics = req['metrics']
-        #print "metrics before", metrics
-        #if "derived" in req:
-        #    metrics.append(req['derived'])
-
-        #print "metrics after", metrics
-        #command = req['command']
-        #print req
         uuid = req['uuid']
         pollTime = float(req['PollTime'])
         instanceType = req['instanceType']
-        
-        #print "metrics, uuid, pollTime",metrics,uuid,pollTime
 
-        print "instanceType", instanceType
         # check if the pid exists
         if instanceType == "docker":
             pidCmd = "sudo docker ps | grep \""+uuid+" \" | awk '{ print $1 }'"
             pid = getPid(uuid,pidCmd)
         elif instanceType == "lxc":
             pid = req['instanceName']
-            #pidCmd = "ps -fe | grep \""+instanceName+" \" | grep -v grep | awk '{print $2}'"
         elif instanceType == "vm":
             pidCmd = "ps -fe | grep \""+uuid+" \" | grep -v grep | awk '{print $2}'"
             pid = getPid(uuid,pidCmd)
-        
-        #print "pid",pid
-         
+
         if pid == "":
             msg = "No process existing for Agent "+uuid
             logger.error("No pid exists for process "+uuid)
@@ -218,32 +194,32 @@ def createAgent():
                 t.daemon = True
                 t.start()
                 msg = "Agent created"
-
+    except Exception.message, e:
+       print "Attempting to load a non-existent payload, please enter desired layout\n"
+       logger.error("Payload was empty or incorrect. A payload must be present and correct")
+       return error
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
+        logger.error(error)
         return error
-        logger.error(error)   
        
     result = {"Agent":uuid,"Message":msg}
     logger.info(result)
     jsondata = json.dumps(result)
+    logger.info("Completed!")
     return jsondata
 
 @route('/terminateAgent/', method='DELETE')
 @route('/terminateAgent', method='DELETE')
 def terminateAgent():
+    logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
     try:          
         # get the body request
-        try:
-           req = json.load(request.body)
-        except ValueError:
-           print "Attempting to load a non-existent payload, please enter desired layout\n"
-           logger.error("Payload was empty or incorrect. A payload must be present and correct")
-
+        req = json.load(request.body)
         uuid = req['uuid']
         print "Terminate Agent request", uuid
         t = getProcessByName(uuid)
@@ -252,6 +228,7 @@ def terminateAgent():
             logger.error("No Agent found "+uuid)
             response.status = 404
             error = {"message":msg,"code":response.status}
+            logger.error(error)
             return error
         else:
             logger.info("Terminate request "+uuid)
@@ -261,64 +238,55 @@ def terminateAgent():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
+    except ValueError:
+        print "Attempting to load a non-existent payload, please enter desired layout\n"
+        logger.error("Payload was empty or incorrect. A payload must be present and correct")
     
     result = {"Agent":uuid,"Message":msg}
     logger.info(result)
     jsondata = json.dumps(result)
+    logger.info("Completed!")
     return jsondata
 
 def getProcessByName(uuid):
     try:
         myprocesses = multiprocessing.active_children()
-
         for p in myprocesses:
             if p.name == uuid:
                 return p
     except Exception.message, e:
         return e
 
-def getPidByName(instanceName):
-    print "In getPidByName"
-
 def getPid(uuid,cmd):
     pid = subprocess.check_output(cmd, shell=True).rstrip()
     if "\n" in pid:
-        #pid = pid.replace('\n',' ')
         pid = "multiple"
     return pid
-
-def destroyAllAgents():
-    print "In destroyAllAgents"
 
 @route('/getResourceValueStore/', method='POST')
 @route('/getResourceValueStore', method='POST')
 def getResourceValueStore():
     logger.info("Called")
     print "In getResourceValueStore"
-
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'POST, HEAD')
-
     try:
-        try:
-           req = json.load(request.body)
-        except ValueError:
-           print "Attempting to load a non-existent payload, please enter desired layout\n"
-           logger.error("Payload was empty or incorrect. A payload must be present and correct")
-        #print "MODE",MODE
+        req = json.load(request.body)
         jsondata = getValuesStore(req) if MODE == "SINGLE" else getValuesStoreMulti(req)
-        #print "GETMETRIC JSONDATA",jsondata
         
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
+    except ValueError:
+           print "Attempting to load a non-existent payload, please enter desired layout\n"
+           logger.error("Payload was empty or incorrect. A payload must be present and correct")
 
-    #print "JSONDATA",jsondata
+    logger.info("Completed!")
     return jsondata
 
 def getValuesStore(req):
@@ -328,16 +296,10 @@ def getValuesStore(req):
     try:
         uuid = req['uuid']
         rformat = req['format']
-        #print "getResourceValueStore request", uuid
-
         tbname = "resourceValuesStore_"+uuid
-        
-        
-        db = sqlite3.connect("hresmon.sqlite")
+        db = sqlite3.connect(hresmonDbName)
         cur = db.cursor()
-
         cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
-
         tbheader = ""
         for tup in cur.fetchall():
             tbheader = tbheader + tup[1] +" "
@@ -353,12 +315,9 @@ def getValuesStore(req):
         cur.execute('select * from \"'+tbname+'\"')
         tb = cur.fetchall()
         for row in tb:
-            #print row
             values = ""
             for v in range(0,len(row)):
                 values = values+'{} '.format(row[v])
-            #print values
-            #values = values + "\n"
             if rformat == "file":
                 tbfile.write(values+ "\n")
             if rformat == "rawdata":
@@ -373,6 +332,10 @@ def getValuesStore(req):
         error = {"message":e,"code":response.status}
         return error
         logger.error(error)
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
     if rformat == "file":
         result = {"Table exported":location+tbname}
@@ -380,28 +343,21 @@ def getValuesStore(req):
         result = {"Table exported":tbs}
     logger.info(result)
     jsondata = json.dumps(result)
-    #print "JSONDATA",jsondata
+    logger.info("Completed!")
     return jsondata
 
 def getValuesStoreMulti(req):
     logger.info("Called")
     print "In getValueStoreMulti"
-    #print "req", req
     try:
-        #print "getValueStoreMulti PRINT req",req
         uuid = req['ReservationID']
-        #rformat = req['format']
         entry = req['Entry']
-        #print uuid,rformat,nlines
-
-        db = sqlite3.connect("hresmon.sqlite")
+        db = sqlite3.connect(hresmonDbName)
         cur = db.cursor()
         cur.execute('VACUUM')
-
         sqlGetTablesByuuid = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE \'%"+uuid+"%\';"
         cur.execute(sqlGetTablesByuuid)
         tables = [str(table[0]) for table in cur.fetchall()]
-        #print tables
         matrix = {}
         files = []
         maxid = getMinMaxID(tables,uuid)
@@ -409,61 +365,31 @@ def getValuesStoreMulti(req):
         for tbname in tables:
             tbs = ""
             METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
-            #print "tbname",tbname
-
-            #tbheader = ""
-            #cur.execute('PRAGMA TABLE_INFO({})'.format("\""+tbname+"\""))
-            #for tup in cur.fetchall():
-            #    tbheader = tbheader + tup[1] +" "
-            
-            #if rformat == "file":
-            #    location = "/tmp/"
-            #    tbfile = open(location+tbname, "wb")
-            #    tbfile.write(tbheader+"\n")
-            #    files.append(location+tbname)
-            
-            
             try:
                 # check if integer value
                 en = int(entry)
-                #print "VALUE", en
+                #print "en, maxid",en,maxid
                 if en < 0:
-                    #cur.execute('select rowid,* from \"'+tbname+'\"')
                     cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY ROWID DESC LIMIT '+str(abs(en))+') order by ROWID ASC')
                 elif en > 0:
-                    #cur.execute('select * from (select rowid,* from \"'+tbname+'\" ORDER BY TIMESTAMP DESC LIMIT '+nlines+') order by TIMESTAMP ASC')
                     cur.execute('select rowid,* from \"'+tbname+'\" WHERE ROWID BETWEEN '+str(en)+' AND '+str(maxid))
             except ValueError:
                 response.status = 400
                 error = {"message":"ValueError: "+nlines,"code":response.status}
-                return error
                 logger.error(error)
+                return error
 
             tb = cur.fetchall()
             for row in tb:
-                #print "row",row
                 values = ""
                 for v in range(0,len(row)):
                     values = values+'{} '.format(row[v])
-                #print "values",values
-                #if rformat == "file":
-                #    tbfile.write(values+ "\n")
-                #if rformat in ('rawdata','derived'):
-                #    tbs = tbs + values+ "\n"
-                #if rformat in ('rawdata'):
+
                 tbs = tbs + values+ "\n"
 
-            #if rformat == "file":
-            #    tbfile.close()
-
             matrix[str(METRIC)] = tbs
-        
-        #print "matrix 1",matrix
-        db.close()
 
-        #if rformat == "file":
-        #    result = {"Tables exported":files}
-        #if rformat == "rawdata":
+        db.close()
         result = matrix
         #if rformat == "derived":
             #print "check 1"
@@ -477,25 +403,31 @@ def getValuesStoreMulti(req):
         #print result
         logger.info(result)
         jsondata = json.dumps(result)
+        logger.info("Completed!")
         return jsondata
 
     except UnboundLocalError:
         response.status = 500
         error = {"message":"UnboundLocalError","code":response.status}
-        return error
         logger.error(error)
-
+        return error
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
+    # except sqlite3.Error, e:
+    #     error = {"message":e,"code":500}
+    #     logger.error(error)
+    #     return error
 
 def getMinMaxID(tables,uuid):
-    db = sqlite3.connect("hresmon.sqlite")
+    #try:
+    db = sqlite3.connect(hresmonDbName)
     cur = db.cursor()
     maxidList = []
     for tbname in tables:
+        #print "tbname",tbname
         METRIC = tbname[tbname.find('_')+1:tbname.find('_'+uuid)]
         cur.execute('select max(rowid) from \"'+tbname+'\"')
         [maxid] = cur.fetchone()
@@ -503,7 +435,11 @@ def getMinMaxID(tables,uuid):
         
     db.close()
     minMaxID = min(maxidList)
-    #print "minMaxID",minMaxID
+    #print "maxidList",maxidList
+    # except sqlite3.Error, e:
+    #     error = {"message":e,"code":500}
+    #     logger.error(error)
+    #     return error
 
     return minMaxID
 
@@ -695,6 +631,7 @@ def runAgentMulti(pollTime,uuid,metrics,pid):
         time.sleep(pollTime)
 
 def runAgentMulti2(pollTime,uuid,metrics,pid):
+    logger.info("Called")
     createResourceValuesStoreMulti(uuid,metrics)
     p = multiprocessing.current_process()
     msg = 'Starting '+p.name+ " to monitor "+pid
@@ -702,32 +639,24 @@ def runAgentMulti2(pollTime,uuid,metrics,pid):
     logger.info(msg)
     sys.stdout.flush()
     nproc = subprocess.check_output("nproc", shell=True).rstrip()
-    #command = buildCommand(metrics)
-    #print commandTimestamp
-    
     pollMultiList = [int(metrics[m]['PollTimeMultiplier']) for m in metrics]
-    #print "pollMultiList",pollMultiList
 
     while True:
         try:
             toBeMeasured = [x for x,y in enumerate(pollMultiList) if y == 1]
-            #print toBeMeasured
-        except ValueError:
-            print "List does not contain value 1"
-        #if some of the pollMulti has reached 1
-        pollMultiList = [i - 1 for i in pollMultiList]
+        
+            #if some of the pollMulti has reached 1
+            pollMultiList = [i - 1 for i in pollMultiList]
 
-        if len(toBeMeasured) > 0:
-            for i in toBeMeasured:
-                key = metrics.keys()[i]
-                #print "metrics.keys()",key
-                command = commandTimestamp+";"+metrics[key]['command']
-                if "__pid__" in command:
-                    command = command.replace("__pid__",pid)
+            if len(toBeMeasured) > 0:
+                for i in toBeMeasured:
+                    key = metrics.keys()[i]
+                    #print "metrics.keys()",key
+                    command = commandTimestamp+";"+metrics[key]['command']
+                    if "__pid__" in command:
+                        command = command.replace("__pid__",pid)
+                        #print "COMMAND for METRICS",command
 
-                #print "COMMAND for METRICS",command
-
-                try:
                     values = subprocess.check_output(command, shell=True).rstrip()
                     values_decoded = values.decode('utf-8')
                     # This convert multiline to singleline
@@ -739,16 +668,17 @@ def runAgentMulti2(pollTime,uuid,metrics,pid):
                     if name == "CPU":
                         values[0] = float(values[0])/int(nproc)
                     
-                    #print values
                     updateResourceValuesStore(name+"_"+uuid,values)
                     val = int(metrics[key]['PollTimeMultiplier'])
                     pollMultiList[i] = val
-                except subprocess.CalledProcessError, e:
-                    print "CalledProcessError",e
-        #print toBeMeasured
-        #print pollMultiList
-        
-        time.sleep(pollTime)
+
+            time.sleep(pollTime)
+        except ValueError:
+            print "List does not contain value 1"
+        except subprocess.CalledProcessError, e:
+            print "CalledProcessError",e
+
+    logger.info("Completed!")
 
 
 def runAgentC(pollTime,uuid,metrics):

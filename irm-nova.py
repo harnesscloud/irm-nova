@@ -73,16 +73,13 @@ def getResources():
         option = "Resources"   
         resources = createListAvailableResources(public_url,token_id,option) 
         r = {"result":resources}       
-
         result = json.dumps(r)
-        #print getImageUUIDbyName("conpaas")
-        #print getNetUUIDbyName("private")
                      
     except Exception.message, e:
-       response.status = 400
-       error = {"message":e,"code":response.status}
-       return error
-       logger.error(error)
+        response.status = 400
+        error = {"message":e,"code":response.status}
+        logger.error(error)
+        return error
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -108,8 +105,8 @@ def getAllocSpec():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -140,8 +137,8 @@ def checkReservation():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     except ValueError as e:
         print e
         print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload\n"   
@@ -166,9 +163,8 @@ def createReservation():
             req = json.load(request.body)
             logger.info("Create Reservation for: "+json.dumps(req))
         except ValueError:
-        	print "N-Irm [reserveResources] Attempting to load a non-existent payload please enter desired payload"
+        	print "N-Irm [reserveResources] Attempting to load a non-existent payload please enter desired payload\n"
         	logger.error("Payload was empty or incorrect. A payload must be present and correct")
-        	print " "
 
         cleanFlavors()
         reservation = {"ReservationID":[]}
@@ -215,8 +211,8 @@ def createReservation():
             except Exception:
                 response.status = 500
                 error = {"message":msg,"code":response.status}
-                return error
                 logger.error(error)
+                return error
 
             try:
                 for novah in h_list:
@@ -246,9 +242,8 @@ def createReservation():
                             except ValueError,e:
                                 response.status = 447
                                 error = {"message":str(e),"code":response.status}
-                                return error
                                 logger.error(error)
-                            #print "getting net UUID"
+                                return error
                         elif CONFIG.has_option('network', 'UUID'):
                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
                                                                                   
@@ -264,7 +259,7 @@ def createReservation():
                             reservation["ReservationID"].append(serverID)
                         except UnboundLocalError:
                             print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-                            logger.error("Attempting to append the ID when it has not been assigned yet")
+                            logger.error("Attempting to append the ID when it has not been assigned yet\n")
                         except KeyError, msg:
                             print r.json()
                             logger.error(r.json())
@@ -294,10 +289,12 @@ def createReservation():
         except Exception.message, e:
             response.status = 400
             error = {"message":e,"code":response.status}
+            logger.error(error)
             return error
         except ValueError, e:
                 response.status = 445
                 error = {"message":str(e),"code":response.status}
+                logger.error(error)
                 return error
 
         jsondata = json.dumps(result)
@@ -310,8 +307,8 @@ def createReservation():
         if name:
             deleteFlavor(name)
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
 
 # To be fixed with DELETE
@@ -354,8 +351,8 @@ def releaseReservation():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
 # To be fixed with DELETE
 @route('/releaseAllReservations/', method='DELETE')
@@ -395,8 +392,8 @@ def releaseAllReservations():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
 
 @route('/calculateCapacity/', method='POST')
 @route('/calculateCapacity', method='POST')
@@ -501,8 +498,8 @@ def calculateCapacity():
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)   
+        logger.error(error)
+        return error   
 
 
 @route('/getMetrics/', method='POST')
@@ -556,14 +553,14 @@ def getMetrics():
             #print e
             response.status = 400
             error = {"message":msg+str(e),"code":response.status}
-            return error
             logger.error("Payload was empty or incorrect. A payload must be present and correct")
+            return error
 
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)   
+        logger.error(error)
+        return error   
 
 ################################################################# End API #######################################################################
 
@@ -652,12 +649,11 @@ def mergeRequestOptim2(reqMetrics,updMetrics):
 def destroyMonitoringInstance(reservations):
     logger.info("Called")
     print "In destroyMonitoringInstance"
-    #print "reservations",reservations
     for ID in reservations['ReservationID']:
         #print "uuid",ID
         logger.info("Destroying Agent: "+ID)
         r = hresmon.destroyAgent(ID)
-    #print r
+    
     logger.info("Completed!")
 
 def registerIRM():

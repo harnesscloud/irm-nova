@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 # Description
-# This is the monitoring deamon that interacts with DB to write the monitored data per VM, and removes them once finished. It exposes methods to create VM table after a VM is created,
-# create reports on the VM resource usage, and delete the table once the VM is destroyed.
+# This is the monitoring deamon that interacts with DB to write the monitored data per instance (VM or container). It exposes methods to create instance table after a instance is created,
+# create reports on the instance resource usage.
 #
-# Each time a vm is created a new entry is added to the main table (resources-status) with active flag true,  a new thread
-# associated to this table is created. The thread starts to read resource usage values and write them in the table. When the VM has ended is lifecyle, the irm-nova will request the stats
-# for that VM. This will start a dedicated thread to analyse calculate the stats from the table
-#
-# 
+# Each time an instance is created a new entry is added to the main table (resources) with NEW in the status. A new thread
+# associated to this table is created in the compute node. The thread starts to read resource usage values and write them in a local table. Raw data measurements can be requested through irm-nova api
+# for each instance
 #
 # Status
-# - functions to be implemented
+# - all implemented
 #
 #
 #
@@ -23,7 +21,9 @@ from libnova import *
 import hresmonAgent
 #from daemon import *
 
-global myname, myprocesses
+global myname, myprocesses, hresmonDbName
+
+hresmonDbName = "hresmon.sqlite"
 myname = os.path.basename(__file__)
 
 def createLogger():
@@ -40,18 +40,28 @@ def createLogger():
 # This function is exposed to the IRM-NOVA which adds entry whenever a VM needs to be monitored. Essentially is creating a new request to hresmon
 def addResourceStatus(uuid,host,request,status):
     print "In addResourceStatus",uuid,host,status
-    db = sqlite3.connect("hresmon.sqlite")
-    db.execute('''INSERT INTO resources(uuid,HOST,REQUEST,status) VALUES (?,?,?,?)''',[uuid,host,request,status])
-    db.commit()
-    db.close
+    try:
+        db = sqlite3.connect(hresmonDbName)
+        db.execute('''INSERT INTO resources(uuid,HOST,REQUEST,status) VALUES (?,?,?,?)''',[uuid,host,request,status])
+        db.commit()
+        db.close
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
 def updateResourceStatus (uuid,status):
     print "In updateResourceStatus"
-    db = sqlite3.connect("hresmon.sqlite")
-    cur = db.cursor()
-    cur.execute('''UPDATE resources SET status= :status WHERE uuid= :uuid''',{'status':status,'uuid':uuid})
-    db.commit()
-    db.close
+    try:
+        db = sqlite3.connect(hresmonDbName)
+        cur = db.cursor()
+        cur.execute('''UPDATE resources SET status= :status WHERE uuid= :uuid''',{'status':status,'uuid':uuid})
+        db.commit()
+        db.close
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
 def deleteResourceStatus():
     print "In deleteResourceStatus"
@@ -69,13 +79,13 @@ def createAgent(data,url):
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     except requests.exceptions.RequestException:
         error = {"message":"socket error","code":"500"}
         print error
-        return error
         logger.error(error)
+        return error
 
     logger.info("Completed!")
     return r
@@ -96,16 +106,17 @@ def destroyAgent(uuid):
             logger.info("response:"+json.dumps(r.json()))
         else:
             r = "No Agent for",uuid
+            logger.info(r)
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     except requests.exceptions.RequestException:
         error = {"message":"RequestException","code":"500"}
         print error
-        return error
         logger.error(error)
+        return error
 
     logger.info("Completed!")
     return r
@@ -114,7 +125,7 @@ def getUrlbyUuid(uuid):
     logger.info("Called")
     print "In getUrlbyUuid"
     ip = ""
-    db = sqlite3.connect("hresmon.sqlite")
+    db = sqlite3.connect(hresmonDbName)
     cur = db.cursor()
     query = "SELECT HOST FROM resources WHERE uuid = \'"+uuid+"\'"
     cur.execute(query)
@@ -127,83 +138,72 @@ def getUrlbyUuid(uuid):
         logger.error(error)
     return ip
 
-def destroyAllAgents():
-    print "In destroyAllAgents"
-
 def getResourceValueStore(req):
     print "In getResourceValueStore"
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     result = {}
     try:
-        #for uuid in req['ReservationID']:
-        #uuid = req['ReservationID']
-        #print "UUID",uuid
         url = getUrlbyUuid(req['ReservationID'])
-        #request = {"uuid":req['ReservationID'],"Entry":req['Entry']}
-        #if derivedMetrics:
-        #    request['derived'] = derivedMetrics
         jsondata = json.dumps(req)
-        #print "JSONDATA",jsondata
         r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
-        #print r.json()
-        #updateResourceStatus (uuid,"REPORTED")
-        #result[uuid] = r.json()
         result["Metrics"] = r.json()
         logger.info("response:"+json.dumps(result))
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
-        return error
         logger.error(error)
+        return error
     except Exception,e:
         error = {"message":e,"code":"500"}
-        return error
         logger.error(error)
+        return error
     except TypeError,e:
         error = {"message":e,"code":"500"}
-        return error
         logger.error(error)
+        return error
     logger.info("Completed!")
     return result
 
-def createStatsListener():
-    print "In createStatsListener"
-
-def destroyStatsListener():
-    print "In destroyStatsListener"
-
 def checkNewRequests():
     print "In checkNewRequests"
-    db = sqlite3.connect("hresmon.sqlite")
-    cursor = db.cursor()
     while True:
-        cursor.execute('''SELECT * from resources WHERE status = "NEW"''')
-        all_rows = cursor.fetchall()
-        for row in all_rows:
-            print row[0],row[3]
-            try:
+        try:
+            db = sqlite3.connect(hresmonDbName)
+            cursor = db.cursor()
+            cursor.execute('''SELECT * from resources WHERE status = "NEW"''')
+            all_rows = cursor.fetchall()
+            #print "all_rows",all_rows
+            for row in all_rows:
                 r = createAgent(row[2],row[1])
                 res = r.json()
-                print res
                 if 'code' not in res:
                     updateResourceStatus(row[0],"RUNNING")
-            except AttributeError,e:
-                error = {"message":e,"code":"444"}
-                print error
-                return error
-                logger.error(error)
-            
-            time.sleep(5)
 
-    db.close
+                time.sleep(5)
+            db.close
+        except AttributeError,e:
+            error = {"message":e,"code":"400"}
+            print error
+            logger.error(error)
+            return error
+        except sqlite3.Error, e:
+            print e
+            error = {"message":e,"code":500}
+            logger.error(error)
+            return error
 
 # if there is not a DB one will be created with the resource-status table
 def init():
     createLogger()
-    conn = sqlite3.connect("hresmon.sqlite")
-    conn.execute('''CREATE TABLE IF NOT EXISTS resources ("uuid" TEXT PRIMARY KEY  NOT NULL  UNIQUE , "HOST" TEXT DEFAULT False, "REQUEST" TEXT NOT NULL, "status" BOOL NOT NULL  DEFAULT False)''')
-    conn.close()
+    try:
+        conn = sqlite3.connect(hresmonDbName)
+        conn.execute('''CREATE TABLE IF NOT EXISTS resources ("uuid" TEXT PRIMARY KEY  NOT NULL  UNIQUE , "HOST" TEXT DEFAULT False, "REQUEST" TEXT NOT NULL, "status" BOOL NOT NULL  DEFAULT False)''')
+        conn.close()
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
 
 
 # the daemon starts and checks the resources-status table constantly for new requests for monitoring by checking if the Status is NEW. If so, it calls the createAgent function and call updateResourceStatus to update the resource-status table relative entry with the name of the agent created and status to ACTIVE
@@ -219,13 +219,7 @@ def start():
         print error
         logger.error(error)
         sys.exit(0)
-    else:
-        print"hresmon started"
-        #with open ("testJsonAgentRequest", "r") as myfile:
-        #    data=myfile.read()
-        
-        #addResourceStatus(createRandomID(10),"10.55.164.160", data, "NEW")
-        
+    else:       
         t = multiprocessing.Process(name="monMaster",target=checkNewRequests,args=())
         t.daemon = True
         t.start()
@@ -239,8 +233,6 @@ def start():
 def main():
     init()
     start()
-    #createAgent()
-    #destroyAgent()
 
 if __name__ == '__main__':
     main()
