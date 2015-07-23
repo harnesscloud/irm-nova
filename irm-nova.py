@@ -74,12 +74,13 @@ def getResources():
         resources = createListAvailableResources(public_url,token_id,option) 
         r = {"result":resources}       
         result = json.dumps(r)
+      
                      
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -106,7 +107,7 @@ def getAllocSpec():
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
     
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
@@ -138,7 +139,7 @@ def checkReservation():
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
     except ValueError as e:
         print e
         print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload\n"   
@@ -212,7 +213,7 @@ def createReservation():
                 response.status = 500
                 error = {"message":msg,"code":response.status}
                 logger.error(error)
-                return error
+                return { "error": error }
 
             try:
                 for novah in h_list:
@@ -243,7 +244,7 @@ def createReservation():
                                 response.status = 447
                                 error = {"message":str(e),"code":response.status}
                                 logger.error(error)
-                                return error
+                                return { "error": error }
                         elif CONFIG.has_option('network', 'UUID'):
                             dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
                                                                                   
@@ -272,7 +273,7 @@ def createReservation():
             except ValueError, e:
                 response.status = 444
                 error = {"message":str(e),"code":response.status}
-                return error
+                return { "error": error }
 
         try:
             reply = checkResources(reservation)
@@ -290,12 +291,12 @@ def createReservation():
             response.status = 400
             error = {"message":e,"code":response.status}
             logger.error(error)
-            return error
+            return { "error": error }
         except ValueError, e:
                 response.status = 445
                 error = {"message":str(e),"code":response.status}
                 logger.error(error)
-                return error
+                return { "error": error }
 
         jsondata = json.dumps(result)
         logger.info("Created Reservation: "+jsondata)
@@ -308,7 +309,7 @@ def createReservation():
             deleteFlavor(name)
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
 
 
 # To be fixed with DELETE
@@ -352,7 +353,7 @@ def releaseReservation():
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
 
 # To be fixed with DELETE
 @route('/releaseAllReservations/', method='DELETE')
@@ -393,7 +394,7 @@ def releaseAllReservations():
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error
+        return { "error": error }
 
 @route('/calculateCapacity/', method='POST')
 @route('/calculateCapacity', method='POST')
@@ -499,7 +500,7 @@ def calculateCapacity():
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error   
+        return { "error": error }   
 
 
 @route('/getMetrics/', method='POST')
@@ -526,7 +527,7 @@ def getMetrics():
             #     except ValueError:
             #         response.status = 400
             #         error = {"message":"ValueError: "+nlines,"code":response.status}
-            #         return error
+            #         return { "error": error }
             #         logger.error(error)
             # else:
             #     try:
@@ -536,7 +537,7 @@ def getMetrics():
             #         response.status = 400
             #         e = nlines + " and " + req['format'] + " bad combination, cannot be in the same request"
             #         error = {"message":"ValueError: "+e,"code":response.status}
-            #         return error
+            #         return { "error": error }
             #         logger.error(error)
 
             #r = hresmon.getResourceValueStore(req,derivedMetrics)
@@ -546,7 +547,7 @@ def getMetrics():
                 raise ValueError(res['message'])
 
             logger.info("Completed!")
-            return res
+            return {"result": res }
         except ValueError,e:
             msg = "N-Irm: Payload was empty or incorrect. A payload must be present and correct\n"
             print msg
@@ -554,13 +555,13 @@ def getMetrics():
             response.status = 400
             error = {"message":msg+str(e),"code":response.status}
             logger.error("Payload was empty or incorrect. A payload must be present and correct")
-            return error
+            return { "error": error }
 
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
         logger.error(error)
-        return error   
+        return { "error": error }   
 
 ################################################################# End API #######################################################################
 
@@ -672,7 +673,7 @@ def registerIRM():
    
     # add here a check if that flavor name exists already and in that case return the correspondent ID
     # without trying to create a new one as it will fail
-    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/addManager', data, headers=headers)
+    r = requests.post(CONFIG.get('CRS', 'CRS_URL')+'/registerManager', data, headers=headers)
     logger.info("Completed!")
 
 
@@ -781,8 +782,17 @@ def main():
     parser.add_option('-u','--username', action='store', default=False,dest='username',help='nova username for the connenction to the API')
     parser.add_option('-w','--password', action='store', default=False,dest='password',help='nova password for the connenction to the API')
     parser.add_option('-c','--config', action='store', default=False,dest='config',help='config file to run the IRM-nova in daemon mode')
+    
+    parser.add_option('-m', '--monitor', action="store_true", default=False, dest='monitor', help='autostart monitor')  
 
     options, args = parser.parse_args()
+    
+    if options.monitor:
+       import subprocess
+       LDIR=os.path.dirname(os.path.abspath(__file__))
+       os.system("pkill -f hresmon")
+       subprocess.Popen(['python', LDIR + '/hresmon.py'])    
+    
     #print options, args
     if options.version:
         #noExtraOptions(options, "version")

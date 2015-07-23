@@ -480,7 +480,7 @@ def getNetworks():
 def checkResources(data):
     logger.info("Called")
     
-    reply = {"Instances":[]}
+    reply = {"Instances":{}}
     if data['ReservationID']:
         #print "Data not empty"
         req = data
@@ -509,14 +509,13 @@ def checkResources(data):
                 if not ERROR:
                     IP = []
                     # change to private to vmnet in field below
-
                     for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
                         if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
                             IP.append(private['addr'])
                             #print "IP:", IP
 
-                    data = {ID:{"Ready":status,"Address":IP}}
-                    reply["Instances"].append(data)
+                    data = {"Ready":status,"Address":IP}
+                    reply["Instances"][ID] = data
             # When there is no ID, this case occurs    
             if ID in req['ReservationID'] is None:
                raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
@@ -525,10 +524,10 @@ def checkResources(data):
             raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
             logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
     else:
-        print "Data empty"
-        reply = "Empty"
+        raise TypError("N-Irm: [checkResources] data is empty!")
 
     logger.info("Completed!")
+
     return reply
 
 def deleteResources(reservations):

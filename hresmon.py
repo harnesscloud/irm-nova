@@ -73,8 +73,9 @@ def createAgent(data,url):
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     try:
+        print "url",url
         r = requests.post('http://'+url+':12000/createAgent', data, headers=headers)
-        #print "url",url
+
         logger.info("response:"+json.dumps(r.json()))
     except Exception.message, e:
         response.status = 400
