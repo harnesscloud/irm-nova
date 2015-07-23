@@ -1,0 +1,23 @@
+{
+   "Allocation":[
+      {
+         "ID":"openstack-compute1",
+         "Type":"Machine",
+         "Attributes":{
+            "Cores":1,
+            "Memory":64,
+            "Disk":2,
+            "Image":"shepard/harness"
+         }
+      }
+   ],
+   "Monitor":{
+               "Machine":{
+               "CPU_TOT_TIME":{"PollTimeMultiplier":2},
+               "CPU_U_S_TIME":{"PollTimeMultiplier":2},
+               "MEM_TOT_BYTE":{"PollTimeMultiplier":2},
+               "MEM_U_S_BYTE":{"PollTimeMultiplier":2}
+               },
+               "PollTime":1
+            }
+}
