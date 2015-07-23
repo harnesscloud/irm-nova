@@ -106,7 +106,8 @@ def destroyAgent(uuid):
             logger.info("response:"+json.dumps(r.json()))
         else:
             r = "No Agent for",uuid
-            logger.info(r)
+            print r
+            logger.warning(r)
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}
@@ -133,9 +134,10 @@ def getUrlbyUuid(uuid):
         [ip] = cur.fetchone()
         logger.info("Completed!")
     except TypeError, e:
-        error = {"message":e,"code":"500"}
-        print error
-        logger.error(error)
+        warning = {"message":e,"code":"500"}
+        print warning
+        logger.warning(warning)
+        return ""
     return ip
 
 def getResourceValueStore(req):
