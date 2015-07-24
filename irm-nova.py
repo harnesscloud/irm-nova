@@ -636,12 +636,12 @@ def mergeRequestOptim(reqMetrics,updMetrics):
 
     return updMetrics
 
-def mergeRequestOptim2(reqMetrics,updMetrics):
+def mergeRequestOptim2(reqMetrics,orgMetrics):
 
+    updMetrics = {"metrics":{}}
     for key in reqMetrics['Machine']:
-        #print "key",key
-        if key in updMetrics['metrics']: 
-            #result[key] = updMetrics['metrics'][key]
+        if key in orgMetrics['metrics']: 
+            updMetrics['metrics'][key] = orgMetrics['metrics'][key]
             updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
 
     return updMetrics

@@ -150,7 +150,7 @@ def getResourceValueStore(req):
         jsondata = json.dumps(req)
         r = requests.post('http://'+url+':12000/getResourceValueStore', data=jsondata, headers=headers)
         result["Metrics"] = r.json()
-        logger.info("response:"+json.dumps(result))
+        #logger.info("response:"+json.dumps(result))
     except Exception.message, e:
         response.status = 400
         error = {"message":e,"code":response.status}

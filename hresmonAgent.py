@@ -383,10 +383,12 @@ def getValuesStoreMulti(req):
             for row in tb:
                 values = ""
                 for v in range(0,len(row)):
-                    values = values+'{} '.format(row[v])
+                    values = values+'{},'.format(row[v])
 
-                tbs = tbs + values+ "\n"
-
+                values = values[:-1]
+                tbs = tbs +","+ values
+                
+            tbs = tbs[1:]
             matrix[str(METRIC)] = tbs
 
         db.close()
@@ -672,7 +674,7 @@ def runAgentMulti2(pollTime,uuid,metrics,pid):
                     val = int(metrics[key]['PollTimeMultiplier'])
                     pollMultiList[i] = val
 
-            time.sleep(pollTime)
+            time.sleep(pollTime/1000)
         except ValueError:
             print "List does not contain value 1"
         except subprocess.CalledProcessError, e:
