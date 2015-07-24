@@ -18,6 +18,6 @@
                "MEM_TOT_BYTE":{"PollTimeMultiplier":2},
                "MEM_U_S_BYTE":{"PollTimeMultiplier":2}
                },
-               "PollTime":1
+               "PollTime":1000
             }
 }
