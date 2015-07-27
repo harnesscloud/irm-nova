@@ -185,6 +185,7 @@ def checkNewRequests():
 
                 time.sleep(5)
             db.close
+            time.sleep(0.5)
         except AttributeError,e:
             error = {"message":e,"code":"400"}
             print error
@@ -229,8 +230,7 @@ def start():
         msg = "hresmon started"
         print msg
         while True:
-            pass
-        
+           time.sleep(100)
 
 
 def main():
