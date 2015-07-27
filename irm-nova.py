@@ -134,6 +134,12 @@ def checkReservation():
         logger.info("Check Reservation for: "+json.dumps(req))
     	reply = checkResources(req)
         result = {"result":reply}
+
+        for ID in req['ReservationID']:
+            monitAgentStatus = "NEW"
+            while monitAgentStatus !="RUNNING" and "NoneType" not in str(monitAgentStatus):
+                monitAgentStatus = hresmon.checkResourceStatus(ID)
+                print "monitAgentStatus",monitAgentStatus
     
     except Exception.message, e:
         response.status = 400

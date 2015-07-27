@@ -63,6 +63,29 @@ def updateResourceStatus (uuid,status):
         logger.error(error)
         return error
 
+# This function is exposed to the IRM-NOVA to check if the status of a monitoring instance
+def checkResourceStatus(uuid):
+    print "In checkResourceStatus",uuid
+    try:
+        db = sqlite3.connect(hresmonDbName)
+        cur = db.cursor()
+        query = "SELECT status FROM resources WHERE uuid = \'"+uuid+"\'"
+        cur.execute(query)
+        [status] = cur.fetchone()
+        db.close
+    except TypeError, e:
+        warning = {"message":e,"code":"500"}
+        print warning
+        logger.warning(warning)
+        return warning
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
+
+    logger.info("Completed!")
+    return status
+
 def deleteResourceStatus():
     print "In deleteResourceStatus"
 
@@ -127,18 +150,24 @@ def getUrlbyUuid(uuid):
     logger.info("Called")
     print "In getUrlbyUuid"
     ip = ""
-    db = sqlite3.connect(hresmonDbName)
-    cur = db.cursor()
-    query = "SELECT HOST FROM resources WHERE uuid = \'"+uuid+"\'"
-    cur.execute(query)
     try:
+        db = sqlite3.connect(hresmonDbName)
+        cur = db.cursor()
+        query = "SELECT HOST FROM resources WHERE uuid = \'"+uuid+"\'"
+        cur.execute(query)
         [ip] = cur.fetchone()
+        db.close
         logger.info("Completed!")
     except TypeError, e:
         warning = {"message":e,"code":"500"}
         print warning
         logger.warning(warning)
         return ""
+    except sqlite3.Error, e:
+        error = {"message":e,"code":500}
+        logger.error(error)
+        return error
+
     return ip
 
 def getResourceValueStore(req):
@@ -183,19 +212,19 @@ def checkNewRequests():
                 if 'code' not in res:
                     updateResourceStatus(row[0],"RUNNING")
 
-                time.sleep(5)
+                #time.sleep(5)
             db.close
             time.sleep(0.5)
         except AttributeError,e:
             error = {"message":e,"code":"400"}
             print error
             logger.error(error)
-            return error
+            #return error
         except sqlite3.Error, e:
             print e
             error = {"message":e,"code":500}
             logger.error(error)
-            return error
+            #return error
 
 # if there is not a DB one will be created with the resource-status table
 def init():
