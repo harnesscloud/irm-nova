@@ -386,9 +386,9 @@ def getValuesStoreMulti(req):
                     values = values+'{},'.format(row[v])
 
                 values = values[:-1]
-                tbs = tbs +","+ values
+                tbs = tbs + values+ "\n"
                 
-            tbs = tbs[1:]
+            #tbs = tbs[1:]
             matrix[str(METRIC)] = tbs
 
         db.close()
