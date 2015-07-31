@@ -8,7 +8,7 @@
             "Memory":64,
             "Disk":2,
             "Image":"shepard/harness",
-            "Subnet":"mySub1"
+            "Subnet":"mySub"
          }
       }
    ],

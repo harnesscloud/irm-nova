@@ -238,21 +238,44 @@ def createReservation():
                                     "max_count": 1,\
                                     "user_data": user_data,\
                                     "availability_zone":host}}
+
                         if CONFIG.has_option('network', 'NET_ID'):
                             try:
                                 UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
-                                #print UUID
+                                print "UUID",UUID
                                 if "not Found" in UUID:
                                     raise ValueError(UUID)
-                                
-                                dobj["server"]["networks"] = [ { "uuid": UUID } ]
+
+                                # sub = resource['Attributes'].get('Subnet')
+                                # if sub:
+                                #     userSubnetName = resource['Attributes']['Subnet']
+                                #     userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
+                                #     mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
+                                #     #print "mgtSubnetUUID",mgtSubnetUUID
+                                #     portName = "HARNESSPORT-"+createRandomID(6)
+                                #     portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
+                                #     dobj["server"]["networks"] = [{"port": portID}]
+                                # else:
+                                #     dobj["server"]["networks"] = [{"uuid":UUID}]
+
                             except ValueError,e:
                                 response.status = 447
                                 error = {"message":str(e),"code":response.status}
                                 logger.error(error)
                                 return { "error": error }
                         elif CONFIG.has_option('network', 'UUID'):
-                            dobj["server"]["networks"] = [ { "uuid": CONFIG.get('network', 'UUID') } ]
+                            UUID = CONFIG.has_option('network', 'UUID')
+                        
+                        sub = resource['Attributes'].get('Subnet')
+                        if sub:
+                            userSubnetName = sub
+                            userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
+                            mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
+                            portName = "HARNESSPORT-"+createRandomID(6)
+                            portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
+                            dobj["server"]["networks"] = [{"port": portID}]
+                        else:
+                            dobj["server"]["networks"] = [{"uuid": UUID}]
                                                                                   
                         data = json.dumps(dobj)
                         print "Creating instance "+name
@@ -719,8 +742,10 @@ def init(novaapi,tenantname,username,password,interface):
     global token_id
     token_id = createToken(os_api_url, tenantname, username, password)
     global public_url
-    public_url = getEndPoint(os_api_url, token_id)
+    global net_url
+    [public_url,net_url] = getEndPoints(os_api_url, token_id)
     #print public_url
+    #print net_url
     #global host_list
     #host_list = loadHostList()
     

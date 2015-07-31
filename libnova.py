@@ -79,20 +79,22 @@ def createToken(os_api_url, tenantName, username, password):
         return None
     logger.info("Completed!")
 
-def getEndPoint(os_api_url, token_id):
+def getEndPoints(os_api_url, token_id):
     logger.info("Called")
     endpoints_url = os_api_url+"/v2.0/tokens/"+token_id+"/endpoints"
     headers = {'X-Auth-Token': token_id}
 
+    urls = []
+
     if str(token_id) not in str(headers):
-        raise AttributeError("N-Irm: [getEndPoint] Failure to assign headers. Possibly incorrect token_id")
+        raise AttributeError("N-Irm: [getEndPoints] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
 
     try:
         r = requests.get(endpoints_url, headers=headers)
         endpoints = r.json()['endpoints']
     except AttributeError:
-        print "N-Irm [getEndPoint] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
+        print "N-Irm [getEndPoints] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
         logger.error("Failed to assign endpoints. Possible incorrect endpoints_url or unable to access endpoints")
     except Exception.message, e:
         response.status = 400
@@ -105,10 +107,17 @@ def getEndPoint(os_api_url, token_id):
         if majorkey['type'] == 'compute':
             global public_url
             public_url = majorkey['publicURL']
-    if public_url:
-        #print public_url
-        logger.info("Endpoint: "+public_url)
-        return public_url
+            #print public_url
+            urls.append(public_url)
+        if majorkey['type'] == 'network':
+            global net_url
+            net_url = majorkey['publicURL']
+            #print net_url
+            urls.append(net_url)
+
+    if urls:
+        logger.info("Urls: "+str(urls))
+        return urls
     else:
         return None
     logger.info("Completed!")
@@ -432,15 +441,14 @@ def getImageUUIDbyName(name):
 
 def getNetUUIDbyName(name):
     logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
+    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
 
     if str(token_id) not in str(headers):
-        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        raise AttributeError("N-Irm: [getNetUUIDbyName] Failure to assign headers. Possibly incorrect token_id")
         logger.error("Failed to assign headers. Possible fault in token_id")
-    
-    r = requests.get(public_url+'/os-networks', headers=headers)
 
     try:
+        r = requests.get(public_url+'/os-networks', headers=headers)
         netId = ""
         for net in r.json()["networks"]:
             if net["label"] == name:
@@ -457,6 +465,119 @@ def getNetUUIDbyName(name):
     logger.info("Completed!")
     return netId
 
+def getSubnetUUIDbyName(name):
+    logger.info("Called")
+    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getSubnetUUIDbyName] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+
+    try:
+        r = requests.get(net_url+'/v2.0/subnets', headers=headers)
+        #print "response json",r.json() 
+        subnetId = ""
+        hname = "HARNESS-"+name
+        #print "hname",hname
+        for subnet in r.json()["subnets"]:
+            if subnet["name"] == hname:
+                subnetId = subnet["id"]
+                break
+            else:
+                subnetId = "Net ID not Found"
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        logger.error(error)
+        return error
+
+    logger.info("Completed!")
+    return subnetId
+
+def getMGTSubnetByNetUUID(netuuid,userSubnetUUID):
+    logger.info("Called")
+    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+    #print "token_id",token_id
+
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+
+    try:
+        #print "userSubnetUUID",userSubnetUUID
+        #print "net_url",net_url
+        r = requests.get(net_url+'/v2.0/networks', headers=headers)
+        subnetId = ""
+        #print "response json",r.json()
+        for net in r.json()["networks"]:
+            #print net
+            if net["id"] == netuuid:
+                for sub in net['subnets']:
+                    if sub != userSubnetUUID:
+                        subnetId = sub
+                        break
+                else:
+                    continue
+                break
+            else:
+                subnetId = "Net ID not Found"
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        logger.error(error)
+        return error
+
+    except Exception, e:
+        #response.status = 404
+        print "ERROR",e
+        error = {"message":e,"code":404}
+        logger.error(error)
+        return error
+
+    logger.info("Completed!")
+    return subnetId
+
+def createPort(netuuid,mgtSubnetUUID,userSubnetUUID,portName):
+    logger.info("Called")
+    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+
+    if str(token_id) not in str(headers):
+        raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
+        logger.error("Failed to assign headers. Possible fault in token_id")
+
+    try: 
+        data = json.dumps({"port": {\
+            "name": portName,\
+            "network_id": netuuid,\
+            "fixed_ips":[{\
+                "subnet_id": mgtSubnetUUID,\
+            },\
+            {\
+                "subnet_id": userSubnetUUID}]}})
+
+        #print data
+        r = requests.post(net_url+'/v2.0/ports', data, headers=headers)
+        portID = ""
+        if r.json()["port"]["id"]:
+            portID = r.json()["port"]["id"]
+            print portID
+        else:
+            portID = "Port ID not found"
+
+    except Exception.message, e:
+        response.status = 500
+        error = {"message":e,"code":response.status}
+        logger.error(error)
+        return error
+
+    except Exception, e:
+        #response.status = 404
+        print "ERROR",e
+        error = {"message":e,"code":404}
+        logger.error(error)
+        return error
+
+    logger.info("Completed!")
+    return portID
 
 def getNetworks():
     logger.info("Called")
