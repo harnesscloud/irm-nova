@@ -555,17 +555,21 @@ def createPort(netuuid,mgtSubnetUUID,userSubnetUUID,portName):
                 "subnet_id": userSubnetUUID}]}})
 
         #print data
-        r = requests.post(net_url+'/v2.0/ports', data, headers=headers)
+        r = requests.post(net_url+'/v2.0/ports', data, headers=headers).json()
+        print ":::>", r
         portID = ""
-        if r.json()["port"]["id"]:
-            portID = r.json()["port"]["id"]
+        
+        if "port" not in r:
+           raise Exception("subnet not valid!")
+            
+        if r["port"]["id"]:
+            portID = r["port"]["id"]
             print portID
         else:
             portID = "Port ID not found"
 
-    except Exception.message, e:
-        response.status = 500
-        error = {"message":e,"code":response.status}
+    except Exception as e:
+        error = {"message":e.message,"code": 500}
         logger.error(error)
         return error
 

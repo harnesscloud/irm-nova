@@ -185,9 +185,15 @@ def createReservation():
             #print "MONITOR section",Monitor
 
         for resource in req['Allocation']:
-            ID = resource['ID']
-
             try:
+                if 'Type' not in resource or resource['Type'] != 'Machine':
+                   msg = "Type not found, or invalid type found in request!"
+                   raise Exception                  
+                if 'ID' not in resource:
+                   msg = "ID not found in allocation request!"
+                   raise Exception            
+                ID = resource['ID']
+
                 if 'Image' in resource['Attributes']:
                     image = getImageUUIDbyName(resource['Attributes']['Image'])
                     #print image
@@ -273,6 +279,8 @@ def createReservation():
                             mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
                             portName = "HARNESSPORT-"+createRandomID(6)
                             portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
+                            if "message" in portID:
+                               raise ValueError(portID)                           
                             dobj["server"]["networks"] = [{"port": portID}]
                         else:
                             dobj["server"]["networks"] = [{"uuid": UUID}]
@@ -300,8 +308,7 @@ def createReservation():
                         msg = "ID: "+ID+" not correct"
                         raise ValueError(msg)
             except ValueError, e:
-                response.status = 444
-                error = {"message":str(e),"code":response.status}
+                error = {"message":str(e),"code":444}
                 return { "error": error }
 
         try:
