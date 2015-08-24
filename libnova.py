@@ -556,7 +556,7 @@ def createPort(netuuid,mgtSubnetUUID,userSubnetUUID,portName):
 
         #print data
         r = requests.post(net_url+'/v2.0/ports', data, headers=headers).json()
-        print ":::>", r
+
         portID = ""
         
         if "port" not in r:
@@ -639,7 +639,8 @@ def checkResources(data):
                             IP.append(private['addr'])
                             #print "IP:", IP
 
-                    data = {"Ready":status,"Address":IP}
+                    #data = {"Ready":status,"Address":IP}
+                    data = {"Ready":status,"Address":[';'.join(IP)]}                    
                     reply["Instances"][ID] = data
             # When there is no ID, this case occurs    
             if ID in req['ReservationID'] is None:
