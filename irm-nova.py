@@ -131,7 +131,7 @@ def checkReservation():
     try:
         req = json.load(request.body)
         logger.info("Check Reservation for: "+json.dumps(req))
-    	reply = checkResources(req)
+        reply = checkResources(req)
         result = {"result":reply}
 
         for ID in req['ReservationID']:
@@ -379,10 +379,14 @@ def releaseReservation():
         destroyMonitoringInstance(reservations)
         reply = deleteResources(reservations)
         logger.info("Completed!")
+        return { "result": {} }
+        
+        '''
         if "DONE" in reply:
             return { "result": { } }
         else:
             return { "result": reply }
+        '''    
     #return r
     except Exception.message, e:
         response.status = 400
@@ -414,11 +418,15 @@ def releaseAllReservations():
             reply = "No reservations to release"
         
         logger.info("Completed!")
+        
+        return { "result": {} }
+        '''
         if "DONE" in reply:
             return { "result": { } }
         else:
             return { "result": reply }
-
+        '''
+        
         if ID in req['ReservationID'] is None:            	
             raise UnboundLocalError
     except UnboundLocalError:
@@ -523,7 +531,7 @@ def calculateCapacity():
             exceed_capacity = attribs["Disk"] < 0                                    
         if exceed_capacity:
             reply = "Allocation cannot be satisfied"
-            result = {"Error":reply}
+            result = {"result": {} }
         else:
             reply = {"Resource":{"Type":rType,"Attributes":attribs}}
             result = {"result":reply}
