@@ -63,7 +63,6 @@ def createLogger():
 
 ######################################################## API ###################################################################
 
-# To be fixed with GET
 @route('/getResources/', method='GET')
 @route('/getResources', method='GET')
 def getResources(): 
