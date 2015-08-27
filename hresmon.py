@@ -25,7 +25,7 @@ global myname, myprocesses, hresmonDbName
 
 hresmonDbName = "hresmon.sqlite"
 myname = os.path.basename(__file__)
-TIMEOUT = 30
+TIMEOUT = 4
 
 def createLogger():
     global logger
