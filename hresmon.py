@@ -13,7 +13,7 @@
 #
 #
 
-import optparse, json, thread, ConfigParser, os, sqlite3, subprocess, time, multiprocessing, requests
+import optparse, json, thread, ConfigParser, os, sqlite3, subprocess, time, multiprocessing, requests, datetime
 from threading import Thread
 import logging
 import logging.handlers as handlers
@@ -25,6 +25,7 @@ global myname, myprocesses, hresmonDbName
 
 hresmonDbName = "hresmon.sqlite"
 myname = os.path.basename(__file__)
+TIMEOUT = 30
 
 def createLogger():
     global logger
@@ -96,7 +97,7 @@ def createAgent(data,url):
     logger.info("Called")
     headers = {'content-type': 'application/json'}
     try:
-        print "url",url
+        #print "url",url
         r = requests.post('http://'+url+':12000/createAgent', data, headers=headers)
 
         logger.info("response:"+json.dumps(r.json()))
@@ -207,10 +208,20 @@ def checkNewRequests():
             all_rows = cursor.fetchall()
             #print "all_rows",all_rows
             for row in all_rows:
-                r = createAgent(row[2],row[1])
-                res = r.json()
-                if 'code' not in res:
-                    updateResourceStatus(row[0],"RUNNING")
+                #print "timestamp",row[4]
+                now = datetime.datetime.now()
+                #print "now",now
+                then = datetime.datetime.strptime(row[4],"%Y-%m-%d %H:%M:%S")
+                tdelta = now - then
+                seconds = tdelta.total_seconds()
+                #print "tdelta",seconds
+                if seconds < TIMEOUT:
+                    r = createAgent(row[2],row[1])
+                    res = r.json()
+                    if 'code' not in res:
+                        updateResourceStatus(row[0],"RUNNING")
+                else:
+                    updateResourceStatus(row[0],"ERROR")
 
                 #time.sleep(5)
             db.close
@@ -231,7 +242,7 @@ def init():
     createLogger()
     try:
         conn = sqlite3.connect(hresmonDbName)
-        conn.execute('''CREATE TABLE IF NOT EXISTS resources ("uuid" TEXT PRIMARY KEY  NOT NULL  UNIQUE , "HOST" TEXT DEFAULT False, "REQUEST" TEXT NOT NULL, "status" BOOL NOT NULL  DEFAULT False)''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS resources ("uuid" TEXT PRIMARY KEY  NOT NULL  UNIQUE , "HOST" TEXT DEFAULT False, "REQUEST" TEXT NOT NULL, "status" BOOL NOT NULL  DEFAULT False, "Timestamp" DATE DEFAULT (datetime('now','localtime')))''')
         conn.close()
     except sqlite3.Error, e:
         error = {"message":e,"code":500}
