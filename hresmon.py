@@ -18,7 +18,6 @@ from threading import Thread
 import logging
 import logging.handlers as handlers
 from libnova import *
-import hresmonAgent
 #from daemon import *
 
 global myname, myprocesses, hresmonDbName
