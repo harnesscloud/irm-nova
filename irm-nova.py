@@ -136,7 +136,7 @@ def checkReservation():
 
         for ID in req['ReservationID']:
             monitAgentStatus = "NEW"
-            while monitAgentStatus !="RUNNING" and "NoneType" not in str(monitAgentStatus):
+            while monitAgentStatus =="NEW" and "NoneType" not in str(monitAgentStatus):
                 monitAgentStatus = hresmon.checkResourceStatus(ID)
                 print "monitAgentStatus",monitAgentStatus
     
