@@ -262,14 +262,16 @@ def start():
         print error
         logger.error(error)
         sys.exit(0)
-    else:       
-        t = multiprocessing.Process(name="monMaster",target=checkNewRequests,args=())
-        t.daemon = True
-        t.start()
-        msg = "hresmon started"
-        print msg
-        while True:
-           time.sleep(100)
+    else:      
+         
+        #t = multiprocessing.Process(name="monMaster",target=checkNewRequests,args=())
+        #t.daemon = True
+        #t.start()
+        #msg = "hresmon started"
+        #print msg
+        #while True:
+        #   time.sleep(100)
+        checkNewRequests()
 
 
 def main():
