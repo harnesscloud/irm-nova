@@ -227,85 +227,85 @@ def createReservation():
                 return { "error": error }
 
             try:
-                for novah in h_list:
-                    if novah == ID:
-                        # build host for availability_zone option to target specific host
-                        host = "nova:"+novah
-                        name = "HARNESS-"+createRandomID(6)
-                        createFlavor(name,vcpu,memory,disk)
-                        headers = {'content-type': 'application/json','X-Auth-Token': token_id}
-                        # build body for nova api
-                        dobj = {"server" : {\
-                                    "name" : name,\
-                                    "imageRef" : image, \
-                                    "flavorRef" : name,\
-                                    "min_count": 1,\
-                                    "max_count": 1,\
-                                    "user_data": user_data,\
-                                    "availability_zone":host}}
+                if ID in h_list:
+                    novah = ID
+                    # build host for availability_zone option to target specific host
+                    host = "nova:"+novah
+                    name = "HARNESS-"+createRandomID(6)
+                    createFlavor(name,vcpu,memory,disk)
+                    headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+                    # build body for nova api
+                    dobj = {"server" : {\
+                                "name" : name,\
+                                "imageRef" : image, \
+                                "flavorRef" : name,\
+                                "min_count": 1,\
+                                "max_count": 1,\
+                                "user_data": user_data,\
+                                "availability_zone":host}}
 
-                        if CONFIG.has_option('network', 'NET_ID'):
-                            try:
-                                UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
-                                print "UUID",UUID
-                                if "not Found" in UUID:
-                                    raise ValueError(UUID)
-
-                                # sub = resource['Attributes'].get('Subnet')
-                                # if sub:
-                                #     userSubnetName = resource['Attributes']['Subnet']
-                                #     userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
-                                #     mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
-                                #     #print "mgtSubnetUUID",mgtSubnetUUID
-                                #     portName = "HARNESSPORT-"+createRandomID(6)
-                                #     portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
-                                #     dobj["server"]["networks"] = [{"port": portID}]
-                                # else:
-                                #     dobj["server"]["networks"] = [{"uuid":UUID}]
-
-                            except ValueError,e:
-                                response.status = 447
-                                error = {"message":str(e),"code":response.status}
-                                logger.error(error)
-                                return { "error": error }
-                        elif CONFIG.has_option('network', 'UUID'):
-                            UUID = CONFIG.has_option('network', 'UUID')
-                        
-                        sub = resource['Attributes'].get('Subnet')
-                        if sub:
-                            userSubnetName = sub
-                            userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
-                            mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
-                            portName = "HARNESSPORT-"+createRandomID(6)
-                            portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
-                            if "message" in portID:
-                               raise ValueError(portID)                           
-                            dobj["server"]["networks"] = [{"port": portID}]
-                        else:
-                            dobj["server"]["networks"] = [{"uuid": UUID}]
-                                                                                  
-                        data = json.dumps(dobj)
-                        print "Creating instance "+name
-                        r = createResources(data)
-
+                    if CONFIG.has_option('network', 'NET_ID'):
                         try:
-                            serverID = r.json()['server']['id']
-                            if Monitor:
-                                createMonitorInstance(serverID,novah,Monitor)
-                        
-                            reservation["ReservationID"].append(serverID)
-                        except UnboundLocalError:
-                            print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-                            logger.error("Attempting to append the ID when it has not been assigned yet\n")
-                        except KeyError, msg:
-                            print r.json()
-                            logger.error(r.json())
-                        # delete flavor
-                        deleteFlavor(name)
-                        break
+                            UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
+                            print "UUID",UUID
+                            if "not Found" in UUID:
+                                raise ValueError(UUID)
+
+                            # sub = resource['Attributes'].get('Subnet')
+                            # if sub:
+                            #     userSubnetName = resource['Attributes']['Subnet']
+                            #     userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
+                            #     mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
+                            #     #print "mgtSubnetUUID",mgtSubnetUUID
+                            #     portName = "HARNESSPORT-"+createRandomID(6)
+                            #     portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
+                            #     dobj["server"]["networks"] = [{"port": portID}]
+                            # else:
+                            #     dobj["server"]["networks"] = [{"uuid":UUID}]
+
+                        except ValueError,e:
+                            response.status = 447
+                            error = {"message":str(e),"code":response.status}
+                            logger.error(error)
+                            return { "error": error }
+                    elif CONFIG.has_option('network', 'UUID'):
+                        UUID = CONFIG.has_option('network', 'UUID')
+                    
+                    sub = resource['Attributes'].get('Subnet')
+                    if sub:
+                        userSubnetName = sub
+                        userSubnetUUID = getSubnetUUIDbyName(userSubnetName)
+                        mgtSubnetUUID = getMGTSubnetByNetUUID(UUID,userSubnetUUID)
+                        portName = "HARNESSPORT-"+createRandomID(6)
+                        portID = createPort(UUID,mgtSubnetUUID,userSubnetUUID,portName)
+                        if "message" in portID:
+                           raise ValueError(portID)                           
+                        dobj["server"]["networks"] = [{"port": portID}]
                     else:
-                        msg = "ID: "+ID+" not correct"
-                        raise ValueError(msg)
+                        dobj["server"]["networks"] = [{"uuid": UUID}]
+                                                                              
+                    data = json.dumps(dobj)
+                    print "Creating instance "+name
+                    r = createResources(data)
+
+                    try:
+                        serverID = r.json()['server']['id']
+                        if Monitor:
+                            createMonitorInstance(serverID,novah,Monitor)
+                    
+                        reservation["ReservationID"].append(serverID)
+                    except UnboundLocalError:
+                        print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
+                        logger.error("Attempting to append the ID when it has not been assigned yet\n")
+                    except KeyError, msg:
+                        print r.json()
+                        logger.error(r.json())
+                    # delete flavor
+                    deleteFlavor(name)
+                    break
+                else:
+                    msg = "ID: "+ID+" not correct"
+                    raise ValueError(msg)
             except ValueError, e:
                 error = {"message":str(e),"code":444}
                 return { "error": error }
