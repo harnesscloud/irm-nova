@@ -199,9 +199,8 @@ def createReservation():
                     if image == "Image Not Found":
                         msg = "Image Not Found"
                         raise Exception
-                else:
-                    if CONFIG.has_option('CRS','IMAGE_NAME'):
-                        image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
+                elif CONFIG.has_option('CRS','IMAGE_NAME'):
+                    image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
                 #print "Image after", image
                 user_data = ''
                 if 'UserData' in resource['Attributes']:
@@ -219,6 +218,10 @@ def createReservation():
                     disk = resource['Attributes']['Disk']
                 else:
                     disk = 20 * 1024
+                if 'securityGroups' in resource['Attributes']:
+                    securityGroups = resource['Attributes']['securityGroups']
+                elif CONFIG.has_option('main','SECURITYGROUP'):
+                    securityGroups = CONFIG.get('main', 'SECURITYGROUP')
 
             except Exception:
                 response.status = 500
@@ -242,6 +245,7 @@ def createReservation():
                                 "min_count": 1,\
                                 "max_count": 1,\
                                 "user_data": user_data,\
+                                "security_groups": securityGroups,\
                                 "availability_zone":host}}
 
                     if CONFIG.has_option('network', 'NET_ID'):
