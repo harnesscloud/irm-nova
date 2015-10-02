@@ -203,6 +203,8 @@ def createReservation():
                     image = getImageUUIDbyName(CONFIG.get('CRS', 'IMAGE_NAME'))
                 #print "Image after", image
                 user_data = ''
+                securityGroups = ''
+                
                 if 'UserData' in resource['Attributes']:
                     user_data = resource['Attributes']['UserData']
 
