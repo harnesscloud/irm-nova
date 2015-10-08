@@ -308,7 +308,7 @@ def createReservation():
                         logger.error(r.json())
                     # delete flavor
                     deleteFlavor(name)
-                    break
+                    #break
                 else:
                     msg = "ID: "+ID+" not correct"
                     raise ValueError(msg)
