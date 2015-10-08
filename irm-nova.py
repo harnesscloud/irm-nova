@@ -247,9 +247,9 @@ def createReservation():
                                 "min_count": 1,\
                                 "max_count": 1,\
                                 "user_data": user_data,\
-                                "security_groups": securityGroups,\
+                                "security_groups": [{"name": securityGroups}],\
                                 "availability_zone":host}}
-
+     
                     if CONFIG.has_option('network', 'NET_ID'):
                         try:
                             UUID = getNetUUIDbyName(CONFIG.get('network', 'NET_ID'))
