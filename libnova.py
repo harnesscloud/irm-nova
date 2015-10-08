@@ -604,7 +604,6 @@ def getNetworks():
 
 def checkResources(data):
     logger.info("Called")
-    
     reply = {"Instances":{}}
     if data['ReservationID']:
         #print "Data not empty"
@@ -650,7 +649,7 @@ def checkResources(data):
             raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
             logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
     else:
-        raise TypError("N-Irm: [checkResources] data is empty!")
+        raise TypeError("N-Irm: [checkResources] data is empty!")
 
     logger.info("Completed!")
 
