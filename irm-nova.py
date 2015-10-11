@@ -46,6 +46,7 @@ import logging
 import logging.handlers as handlers
 import libnova
 from libnova import *
+import copy
 
 #from pudb import set_trace; set_trace()
 
@@ -157,6 +158,54 @@ def checkReservation():
     else:
         return None
 
+########## create/associate Public IP to instance
+publicIPs = {}
+def createPublicIPs(instances):
+    global publicIPs
+    logger.info("Called")
+
+    for instance in instances:
+        headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+        try:
+            r = requests.post(public_url+'/os-floating-ips', json.dumps({'pool': 'public'}), headers=headers)
+            if r.status_code == 200:
+               resp = r.json()["floating_ip"]
+               r2 = requests.post(public_url+'/servers/%s/action' % str(instance) , json.dumps(
+                                     {'addFloatingIp': {'address': resp['ip']}}), headers=headers)
+               
+               if ("id" in resp) and ("ip" in resp):
+                  publicIPs[instance] = { "id":  resp["id"], "ip": resp["ip"] }
+             
+        except Exception as e:
+            error = {"message":str(e),"code":400}
+            logger.error(error)
+            return error
+        
+    logger.info("Completed!")
+
+def deletePublicIPs(instances):
+    global publicIPs
+    logger.info("Called")
+    
+    for instance in instances:   
+        headers = {'content-type': 'application/json','X-Auth-Token': token_id}
+        try:
+           print "****>", str(publicIPs)
+           if instance in copy.copy(publicIPs):
+              ID = publicIPs[instance]["id"]
+              r2 = requests.delete(public_url+'/os-floating-ips/%s' % str(ID), headers=headers)
+              del publicIPs[instance]
+           
+        except Exception as e:
+           error = {"message":str(e),"code":400}
+           print "error: ", error
+           logger.error(error)
+           return error
+        
+    logger.info("Completed!")
+           
+############################
+
 @route('/createReservation/', method='POST')
 @route('/createReservation', method='POST')
 def createReservation():
@@ -178,6 +227,7 @@ def createReservation():
         name = ""
         h_list = getHosts()
         Monitor = ""
+        public_ip_reqs = []
 
         if 'Monitor' in req:
             Monitor = req['Monitor']
@@ -291,11 +341,16 @@ def createReservation():
                         dobj["server"]["networks"] = [{"uuid": UUID}]
                                                                               
                     data = json.dumps(dobj)
-                    print "Creating instance "+name
-                    r = createResources(data)
+                    print "Creating instance "+name 
 
+                    r = createResources(data)
+                    
+                    serverID = r.json()['server']['id']
+                    # store requests
+                    if 'PublicIP' in resource['Attributes']:
+                       public_ip_reqs.append(serverID)
+ 
                     try:
-                        serverID = r.json()['server']['id']
                         if Monitor:
                             createMonitorInstance(serverID,novah,Monitor)
                     
@@ -326,7 +381,7 @@ def createReservation():
                 msg = "No reservation made. Check your request"
                 raise ValueError(msg)
             else:
-                #print "found true"
+                createPublicIPs(public_ip_reqs)
                 result = {"result":reservation}
         except Exception.message, e:
             response.status = 400
@@ -383,6 +438,7 @@ def releaseReservation():
     	logger.error("Payload was empty or incorrect. A payload must be present and correct")
     try:
         destroyMonitoringInstance(reservations)
+        deletePublicIPs(reservations['ReservationID'])
         reply = deleteResources(reservations)
         logger.info("Completed!")
         return { "result": {} }
@@ -404,13 +460,17 @@ def releaseReservation():
 @route('/releaseAllReservations/', method='DELETE')
 @route('/releaseAllReservations', method='DELETE')
 def releaseAllReservations():
+    global publicIPs
     logger.info("Called")
     response.set_header('Content-Type', 'application/json')
     response.set_header('Accept', '*/*')
     response.set_header('Allow', 'DELETE, HEAD')
 
     try:
+        print ":::::>", publicIPs.keys()
+        deletePublicIPs(publicIPs.keys())
         reservations = getListInstances()
+
         logger.info("Release reservations: "+json.dumps(reservations))
         #print "reservations",reservations
     except ValueError:
