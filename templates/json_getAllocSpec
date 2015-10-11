@@ -37,7 +37,9 @@
 	            	"CPU_TOT_TIME": {"Description": "CPU Total Time", "DataType":"FLOAT"},
 	            	"CPU_U_S_TIME": {"Description": "CPU User Time", "DataType":"FLOAT"},
 	            	"MEM_TOT_TIME": {"Description": "MEM Total Time", "DataType":"FLOAT"},
-	            	"MEM_U_S_TIME": {"Description": "MEM User Time", "DataType":"FLOAT"}
+	            	"MEM_U_S_TIME": {"Description": "MEM User Time", "DataType":"FLOAT"},
+	            	"MEMORY_UTILIZATION": {"Description": "Memory Utilization", "DataType":"FLOAT"},
+	            	"CORES_UTILIZATION": {"Description": "Cores Utilization", "DataType":"FLOAT"}	            	
 	         	}
 	      	}    
 	    } 
