@@ -1,68 +1,64 @@
-{
-    "docker": {
-        "metrics": {
-            "CPU_TOT_TIME": {
-                "type": "FLOAT",
-                "command": "cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
-            },
-            "CPU_U_S_TIME": {
-                "type": "FLOAT",
-                "command": "cat __cgroup__/cpuacct/docker/__pid__*/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
-            },
-            "MEM_TOT_BYTE": {
-                "type": "FLOAT",
-                "command": "cat __cgroup__/memory/docker/__pid__*/memory.limit_in_bytes"
-            },
-            "MEM_U_S_BYTE": {
-                "type": "FLOAT",
-                "command": "cat __cgroup__/memory/docker/__pid__*/memory.usage_in_bytes"
-            },
-            "MEMORY_UTILIZATION": {
-                "type": "FLOAT",
-                "command": "MEMTOT=$(cat /proc/meminfo | grep MemTotal | awk '{print $2*1000}');MEM_USAGE=$(cat __cgroup__/memory/docker/__pid__*/memory.usage_in_bytes);MEMPERC=$(echo \"scale=2;$MEM_USAGE*100/$MEMTOT\" | bc -l);echo $MEMPERC;"
-            },
-            " CORES_UTILIZATION": {
-                "type": "FLOAT",
-                "command": "CPUUSLENGHT=$(cat __cgroup__/cpuacct/docker/__pid__*/cpuacct.usage_percpu | wc -w);CPUTOT_BEFORE=$(cat /proc/stat | grep \"^cpu\" | sed -n 1p | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }');CPUUS_BEFORE=$(cat \"__cgroup__/cpuacct/docker/__pid__*/cpuacct.stat\" |awk '{SUM_BEFORE+=$2 ;}END {print SUM_BEFORE ;}');sleep 0.5;CPUUS_AFTER=$(cat \"__cgroup__/cpuacct/docker/__pid__*/cpuacct.stat\" |awk '{SUM_AFTER+=$2 ;}END {print SUM_AFTER ;}');CPUTOT_AFTER=$(cat /proc/stat | grep \"^cpu\" | sed -n 1p | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }');CPUTOTDELTA=$((CPUTOT_AFTER-CPUTOT_BEFORE));CPUUSDELTA=$(((CPUUS_AFTER-CPUUS_BEFORE)));CPUPERC=$(echo \"scale=2;$CPUUSDELTA*100*$CPUUSLENGHT/$CPUTOTDELTA\" | bc -l);echo $CPUPERC;"
-            }
-        }
-    },
-    "lxc": {
-        "metrics": [
-            {
-                "name": "CPU_TOT_TIME",
-                "type": "FLOAT",
-                "command": "cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
-            },
-            {
-                "name": "CPU_U_S_TIME",
-                "type": "FLOAT",
-                "command": "cat /sys/fs/cgroup/cpuacct/libvirt/lxc/__pid__/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
-            },
-            {
-                "name": "MEM_TOT_BYTE",
-                "type": "FLOAT",
-                "command": "cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.limit_in_bytes"
-            },
-            {
-                "name": "MEM_U_S_BYTE",
-                "type": "FLOAT",
-                "command": "cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.usage_in_bytes"
-            }
-        ]
-    },
-    "vm": {
-        "metrics": [
-            {
-                "name": "CPU",
-                "type": "FLOAT",
-                "command": "top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $9}'"
-            },
-            {
-                "name": "MEM",
-                "type": "FLOAT",
-                "command": "top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $10}'"
-            }
-        ]
-    }
+{    
+     "docker":
+     {
+          "metrics":
+          {
+               "CPU_TOT_TIME":{
+                    "type":"FLOAT",
+                    "command":"cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
+                    },
+               "CPU_U_S_TIME":{ 
+                    "type":"FLOAT",
+                    "command":"cat /sys/fs/cgroup/cpuacct/docker/__pid__*/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
+                    },
+               "MEM_TOT_BYTE":{
+                    "type":"FLOAT",
+                    "command":"cat /sys/fs/cgroup/memory/docker/__pid__*/memory.limit_in_bytes"
+                    },
+               "MEM_U_S_BYTE":{
+                    "type":"FLOAT",
+                    "command":"cat /sys/fs/cgroup/memory/docker/__pid__*/memory.usage_in_bytes"
+                    },
+               "MEMORY_UTILIZATION":{
+                    "type":"FLOAT",
+                    "command":"MEMTOT=$(cat /proc/meminfo | grep MemTotal | awk '{print $2*1000}');MEM_USAGE=$(cat /sys/fs/cgroup/memory/docker/__pid__*/memory.usage_in_bytes);MEMPERC=$(echo \"scale=2;$MEM_USAGE*100/$MEMTOT\" | bc -l);echo $MEMPERC;"
+                    },
+               "CORES_UTILIZATION":{ 
+                    "type":"FLOAT",
+                    "command":"CPUUSLENGHT=$(cat /sys/fs/cgroup/cpuacct/docker/__pid__*/cpuacct.usage_percpu | wc -w);CPUTOT_BEFORE=$(cat /proc/stat | grep \"^cpu\" | sed -n 1p | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }');CPUUS_BEFORE=$(cat /sys/fs/cgroup/cpuacct/docker/__pid__*/cpuacct.stat |awk '{SUM_BEFORE+=$2 ;}END {print SUM_BEFORE ;}');sleep 0.5;CPUUS_AFTER=$(cat /sys/fs/cgroup/cpuacct/docker/__pid__*/cpuacct.stat |awk '{SUM_AFTER+=$2 ;}END {print SUM_AFTER ;}');CPUTOT_AFTER=$(cat /proc/stat | grep \"^cpu\" | sed -n 1p | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }');CPUTOTDELTA=$((CPUTOT_AFTER-CPUTOT_BEFORE));CPUUSDELTA=$(((CPUUS_AFTER-CPUUS_BEFORE)));CPUPERC=$(echo \"scale=2;$CPUUSDELTA*100*$CPUUSLENGHT/$CPUTOTDELTA\" | bc -l);echo $CPUPERC;"
+                    }
+          }
+     },
+     "lxc":
+     {
+          "metrics":
+          [
+               {"name":"CPU_TOT_TIME", 
+               "type":"FLOAT",
+               "command":"cat /proc/stat | grep \"^cpu \" | sed \"s:cpu  ::\" | awk '{ for(i=1;i<=NF;i++)SUM+=$i} END { print SUM }'"
+               },
+               {"name":"CPU_U_S_TIME", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/cpuacct/libvirt/lxc/__pid__/cpuacct.stat | awk '{SUM+=$2} END { print SUM }'"
+               },
+               {"name":"MEM_TOT_BYTE", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.limit_in_bytes"},
+               {"name":"MEM_U_S_BYTE", 
+               "type":"FLOAT",
+               "command":"cat /sys/fs/cgroup/memory/libvirt/lxc/__pid__/memory.usage_in_bytes"}
+          ]
+     },
+     "vm":
+     {
+          "metrics":
+          [
+               {"name":"CPU", 
+               "type":"FLOAT",
+               "command":"top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $9}'"},
+               {"name":"MEM", 
+               "type":"FLOAT",
+               "command":"top -b -p __pid__ -n 1 | tail -n 1 | awk '{print $10}'"}
+          ]
+     }
 }
