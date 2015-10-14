@@ -41,12 +41,13 @@ import requests, json, pickle, sys, os, subprocess,optparse, time, thread, hresm
 import re
 from bottle import route, run,response,request,re
 import ConfigParser
-from threading import Thread
+from threading import Thread, Timer
 import logging
 import logging.handlers as handlers
 import libnova
 from libnova import *
 import copy
+
 
 #from pudb import set_trace; set_trace()
 
@@ -285,6 +286,7 @@ def createReservation():
                 if ID in h_list:
                     novah = ID
                     # build host for availability_zone option to target specific host
+     
                     host = "nova:"+novah
                     name = "HARNESS-"+createRandomID(6)
                     createFlavor(name,vcpu,memory,disk)
@@ -815,12 +817,27 @@ def startAPI(IP_ADDR,PORT_ADDR):
     logger.info("Completed!")
     return IP_ADDR
 
+def refresh_token():
+   global CONFIG, os_api_url, token_id
+   
+   tenantname = CONFIG.get('main', 'TENANT_NAME')
+   username = CONFIG.get('main', 'USERNAME')
+   password = CONFIG.get('main', 'PASSWORD')
+   
+   print "requesting token..."
+   token_id = createToken(os_api_url, tenantname, username, password)
+   
+   Timer(1200.0, refresh_token).start (); 
+      
+       
 def init(novaapi,tenantname,username,password,interface):
     logger.info("Called")
     global os_api_url 
     os_api_url = "http://"+novaapi
-    global token_id
-    token_id = createToken(os_api_url, tenantname, username, password)
+    #global token_id
+    #token_id = createToken(os_api_url, tenantname, username, password)
+    refresh_token()
+    
     global public_url
     global net_url
     [public_url,net_url] = getEndPoints(os_api_url, token_id)
