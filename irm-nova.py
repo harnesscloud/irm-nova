@@ -229,9 +229,20 @@ def createReservation():
         h_list = getHosts()
         Monitor = ""
         public_ip_reqs = []
-
+        
+        cattribs = {} # cattribs has the common attributes across all requests
+                      # used to substitute metric commands if necessary
         if 'Monitor' in req:
             Monitor = req['Monitor']
+            req_machines = [ x['Attributes'] for x in req['Allocation'] if x['Type'] == "Machine" ]
+            n = len(req_machines)
+            if n > 0:
+               cattribs = req_machines[0]
+               for i in range(1,n):
+                  R = req_machines[i]
+                  cattribs = {x:y  for (x,y) in cattribs.items() if x in R and R[x] == y} 
+            else:
+               cattribs = {}
             #print "MONITOR section",Monitor
 
         for resource in req['Allocation']:
@@ -354,7 +365,7 @@ def createReservation():
  
                     try:
                         if Monitor:
-                            createMonitorInstance(serverID,novah,Monitor)
+                            createMonitorInstance(serverID,novah,Monitor, cattribs)
                     
                         reservation["ReservationID"].append(serverID)
                     except UnboundLocalError:
@@ -469,7 +480,6 @@ def releaseAllReservations():
     response.set_header('Allow', 'DELETE, HEAD')
 
     try:
-        print ":::::>", publicIPs.keys()
         deletePublicIPs(publicIPs.keys())
         reservations = getListInstances()
 
@@ -676,7 +686,7 @@ def getMetrics():
 
 ################################################################# End API #######################################################################
 
-def createMonitorInstance(uuid,host,reqMetrics):
+def createMonitorInstance(uuid,host,reqMetrics,cattribs={}):
     logger.info("Called")
     logger.info("Create monitor instance for "+uuid+" in host "+host)
     print "In monitorInstance"
@@ -699,7 +709,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
         if itype == "docker":
             #template.update(METRICS['container'])
             updMetrics = METRICS['docker']
-            updMetrics = mergeRequestOptim2(reqMetrics,updMetrics)
+            updMetrics = mergeRequestOptim2(reqMetrics,updMetrics,cattribs)
             updMetrics['instanceType'] = "docker"
 
         if itype == "LXC":
@@ -748,14 +758,19 @@ def mergeRequestOptim(reqMetrics,updMetrics):
 
     return updMetrics
 
-def mergeRequestOptim2(reqMetrics,orgMetrics):
-
+def mergeRequestOptim2(reqMetrics,orgMetrics,cattribs):
+    print ":::::::::>", cattribs
     updMetrics = {"metrics":{}}
     for key in reqMetrics['Machine']:
         if key in orgMetrics['metrics']: 
-            updMetrics['metrics'][key] = orgMetrics['metrics'][key]
-            updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
+            org_metrics = orgMetrics['metrics'][key]
+            cmd = org_metrics['command']
+            for c in cattribs:
+               cmd = cmd.replace('%'+c.upper(), str(cattribs[c]))
 
+            updMetrics['metrics'][key] = copy.deepcopy(orgMetrics['metrics'][key])
+            updMetrics['metrics'][key]['command'] = cmd
+            updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
     return updMetrics
 
 def destroyMonitoringInstance(reservations):
@@ -827,7 +842,7 @@ def refresh_token():
    print "requesting token..."
    token_id = createToken(os_api_url, tenantname, username, password)
    
-   Timer(1200.0, refresh_token).start (); 
+   #Timer(1200.0, refresh_token).start (); 
       
        
 def init(novaapi,tenantname,username,password,interface):
