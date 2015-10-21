@@ -842,7 +842,7 @@ def refresh_token():
    print "requesting token..."
    token_id = createToken(os_api_url, tenantname, username, password)
    
-   #Timer(1200.0, refresh_token).start (); 
+   Timer(1200.0, refresh_token).start (); 
       
        
 def init(novaapi,tenantname,username,password,interface):
