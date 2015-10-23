@@ -168,15 +168,29 @@ def createPublicIPs(instances):
     for instance in instances:
         headers = {'content-type': 'application/json','X-Auth-Token': token_id}
         try:
-            r = requests.post(public_url+'/os-floating-ips', json.dumps({'pool': 'public'}), headers=headers)
-            if r.status_code == 200:
-               resp = r.json()["floating_ip"]
-               r2 = requests.post(public_url+'/servers/%s/action' % str(instance) , json.dumps(
-                                     {'addFloatingIp': {'address': resp['ip']}}), headers=headers)
-               
-               if ("id" in resp) and ("ip" in resp):
-                  publicIPs[instance] = { "id":  resp["id"], "ip": resp["ip"] }
-             
+            instance_id = instance[0]
+            instance_ip = instance[1]
+            
+            if type(instance_ip) == unicode:
+               instance_ip = str(instance_ip)
+            
+            IP = None
+            resp = None
+            if (type(instance_ip) == int) or (type(instance_ip) == bool) or (type(instance_ip) == str and instance_ip.upper() == "TRUE"):           
+                r = requests.post(public_url+'/os-floating-ips', json.dumps({'pool': 'public'}), headers=headers)
+                if r.status_code == 200:
+                    resp = r.json()["floating_ip"]
+                    IP = resp["ip"]
+                    if ("id" in resp) and ("ip" in resp):
+                       publicIPs[instance] = { "id":  resp["id"], "ip": resp["ip"] }
+                    
+            elif type(instance_ip) == str:
+                IP = instance_ip         
+            
+            if IP != None:   
+                r2 = requests.post(public_url+'/servers/%s/action' % instance_id , json.dumps(
+                                     {'addFloatingIp': {'address': IP}}), headers=headers)
+       
         except Exception as e:
             error = {"message":str(e),"code":400}
             logger.error(error)
@@ -191,7 +205,6 @@ def deletePublicIPs(instances):
     for instance in instances:   
         headers = {'content-type': 'application/json','X-Auth-Token': token_id}
         try:
-           print "****>", str(publicIPs)
            if instance in copy.copy(publicIPs):
               ID = publicIPs[instance]["id"]
               r2 = requests.delete(public_url+'/os-floating-ips/%s' % str(ID), headers=headers)
@@ -361,7 +374,7 @@ def createReservation():
                     serverID = r.json()['server']['id']
                     # store requests
                     if 'PublicIP' in resource['Attributes']:
-                       public_ip_reqs.append(serverID)
+                       public_ip_reqs.append((serverID, resource['Attributes']['PublicIP']))
  
                     try:
                         if Monitor:
