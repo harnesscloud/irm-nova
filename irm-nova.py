@@ -41,12 +41,13 @@ import requests, json, pickle, sys, os, subprocess,optparse, time, thread, hresm
 import re
 from bottle import route, run,response,request,re
 import ConfigParser
-from threading import Thread
+from threading import Thread, Timer
 import logging
 import logging.handlers as handlers
 import libnova
 from libnova import *
 import copy
+
 
 #from pudb import set_trace; set_trace()
 
@@ -167,15 +168,29 @@ def createPublicIPs(instances):
     for instance in instances:
         headers = {'content-type': 'application/json','X-Auth-Token': token_id}
         try:
-            r = requests.post(public_url+'/os-floating-ips', json.dumps({'pool': 'public'}), headers=headers)
-            if r.status_code == 200:
-               resp = r.json()["floating_ip"]
-               r2 = requests.post(public_url+'/servers/%s/action' % str(instance) , json.dumps(
-                                     {'addFloatingIp': {'address': resp['ip']}}), headers=headers)
-               
-               if ("id" in resp) and ("ip" in resp):
-                  publicIPs[instance] = { "id":  resp["id"], "ip": resp["ip"] }
-             
+            instance_id = instance[0]
+            instance_ip = instance[1]
+            
+            if type(instance_ip) == unicode:
+               instance_ip = str(instance_ip)
+            
+            IP = None
+            resp = None
+            if (type(instance_ip) == int) or (type(instance_ip) == bool) or (type(instance_ip) == str and instance_ip.upper() == "TRUE"):           
+                r = requests.post(public_url+'/os-floating-ips', json.dumps({'pool': 'public'}), headers=headers)
+                if r.status_code == 200:
+                    resp = r.json()["floating_ip"]
+                    IP = resp["ip"]
+                    if ("id" in resp) and ("ip" in resp):
+                       publicIPs[instance] = { "id":  resp["id"], "ip": resp["ip"] }
+                    
+            elif type(instance_ip) == str:
+                IP = instance_ip         
+            
+            if IP != None:   
+                r2 = requests.post(public_url+'/servers/%s/action' % instance_id , json.dumps(
+                                     {'addFloatingIp': {'address': IP}}), headers=headers)
+       
         except Exception as e:
             error = {"message":str(e),"code":400}
             logger.error(error)
@@ -190,7 +205,6 @@ def deletePublicIPs(instances):
     for instance in instances:   
         headers = {'content-type': 'application/json','X-Auth-Token': token_id}
         try:
-           print "****>", str(publicIPs)
            if instance in copy.copy(publicIPs):
               ID = publicIPs[instance]["id"]
               r2 = requests.delete(public_url+'/os-floating-ips/%s' % str(ID), headers=headers)
@@ -228,9 +242,20 @@ def createReservation():
         h_list = getHosts()
         Monitor = ""
         public_ip_reqs = []
-
+        
+        cattribs = {} # cattribs has the common attributes across all requests
+                      # used to substitute metric commands if necessary
         if 'Monitor' in req:
             Monitor = req['Monitor']
+            req_machines = [ x['Attributes'] for x in req['Allocation'] if x['Type'] == "Machine" ]
+            n = len(req_machines)
+            if n > 0:
+               cattribs = req_machines[0]
+               for i in range(1,n):
+                  R = req_machines[i]
+                  cattribs = {x:y  for (x,y) in cattribs.items() if x in R and R[x] == y} 
+            else:
+               cattribs = {}
             #print "MONITOR section",Monitor
 
         for resource in req['Allocation']:
@@ -285,6 +310,7 @@ def createReservation():
                 if ID in h_list:
                     novah = ID
                     # build host for availability_zone option to target specific host
+     
                     host = "nova:"+novah
                     name = "HARNESS-"+createRandomID(6)
                     createFlavor(name,vcpu,memory,disk)
@@ -348,11 +374,11 @@ def createReservation():
                     serverID = r.json()['server']['id']
                     # store requests
                     if 'PublicIP' in resource['Attributes']:
-                       public_ip_reqs.append(serverID)
+                       public_ip_reqs.append((serverID, resource['Attributes']['PublicIP']))
  
                     try:
                         if Monitor:
-                            createMonitorInstance(serverID,novah,Monitor)
+                            createMonitorInstance(serverID,novah,Monitor, cattribs)
                     
                         reservation["ReservationID"].append(serverID)
                     except UnboundLocalError:
@@ -467,7 +493,6 @@ def releaseAllReservations():
     response.set_header('Allow', 'DELETE, HEAD')
 
     try:
-        print ":::::>", publicIPs.keys()
         deletePublicIPs(publicIPs.keys())
         reservations = getListInstances()
 
@@ -674,7 +699,7 @@ def getMetrics():
 
 ################################################################# End API #######################################################################
 
-def createMonitorInstance(uuid,host,reqMetrics):
+def createMonitorInstance(uuid,host,reqMetrics,cattribs={}):
     logger.info("Called")
     logger.info("Create monitor instance for "+uuid+" in host "+host)
     print "In monitorInstance"
@@ -697,7 +722,7 @@ def createMonitorInstance(uuid,host,reqMetrics):
         if itype == "docker":
             #template.update(METRICS['container'])
             updMetrics = METRICS['docker']
-            updMetrics = mergeRequestOptim2(reqMetrics,updMetrics)
+            updMetrics = mergeRequestOptim2(reqMetrics,updMetrics,cattribs)
             updMetrics['instanceType'] = "docker"
 
         if itype == "LXC":
@@ -746,14 +771,19 @@ def mergeRequestOptim(reqMetrics,updMetrics):
 
     return updMetrics
 
-def mergeRequestOptim2(reqMetrics,orgMetrics):
-
+def mergeRequestOptim2(reqMetrics,orgMetrics,cattribs):
+    print ":::::::::>", cattribs
     updMetrics = {"metrics":{}}
     for key in reqMetrics['Machine']:
         if key in orgMetrics['metrics']: 
-            updMetrics['metrics'][key] = orgMetrics['metrics'][key]
-            updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
+            org_metrics = orgMetrics['metrics'][key]
+            cmd = org_metrics['command']
+            for c in cattribs:
+               cmd = cmd.replace('%'+c.upper(), str(cattribs[c]))
 
+            updMetrics['metrics'][key] = copy.deepcopy(orgMetrics['metrics'][key])
+            updMetrics['metrics'][key]['command'] = cmd
+            updMetrics['metrics'][key].update(reqMetrics['Machine'][key])
     return updMetrics
 
 def destroyMonitoringInstance(reservations):
@@ -815,12 +845,27 @@ def startAPI(IP_ADDR,PORT_ADDR):
     logger.info("Completed!")
     return IP_ADDR
 
+def refresh_token():
+   global CONFIG, os_api_url, token_id
+   
+   tenantname = CONFIG.get('main', 'TENANT_NAME')
+   username = CONFIG.get('main', 'USERNAME')
+   password = CONFIG.get('main', 'PASSWORD')
+   
+   print "requesting token..."
+   token_id = createToken(os_api_url, tenantname, username, password)
+   
+   Timer(1200.0, refresh_token).start (); 
+      
+       
 def init(novaapi,tenantname,username,password,interface):
     logger.info("Called")
     global os_api_url 
     os_api_url = "http://"+novaapi
-    global token_id
-    token_id = createToken(os_api_url, tenantname, username, password)
+    #global token_id
+    #token_id = createToken(os_api_url, tenantname, username, password)
+    refresh_token()
+    
     global public_url
     global net_url
     [public_url,net_url] = getEndPoints(os_api_url, token_id)
