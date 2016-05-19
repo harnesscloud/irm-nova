@@ -316,7 +316,7 @@ def createListAvailableResources(public_url,token_id,option):
                              total_cpu = Machines[m]["Cores"]
                           if "Memory" in Machines[m]:
                              total_memory = Machines[m]["Memory"]
-                       break   
+                          break   
                     
                 if majorkey['resource']['project'] == '(used_now)':
                     used_mem = majorkey['resource']['memory_mb']
