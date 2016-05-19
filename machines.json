@@ -1,3 +1,10 @@
 {
-	"paranoia": { "Cores": 20 }
+	"paranoia": { "Cores": 20 },
+	"parapluie": { "Cores": 24 },
+	"hercule": { "Cores": 12 },
+	"orion": { "Cores": 12 },
+	"taurus": { "Cores": 12 },
+	"sagittaire": { "Cores": 2 },
+	"griffon": { "Cores": 8 },
+	"graphene": { "Cores": 4 }
 }
