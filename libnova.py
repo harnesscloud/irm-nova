@@ -260,12 +260,24 @@ def getHostDetails(hostname):
     else:
        return None
     
+Machines = None
 
 def createListAvailableResources(public_url,token_id,option):
     logger.info("Called")
     res = {option:{}}
     h_list = getHosts()
     #print "h_list",h_list
+    global Machines
+    
+    if Machines == None:
+       Machines = {}
+       try:
+   	      path = os.path.dirname(os.path.abspath(__file__))
+	      with open(path + '/machines.json') as data_file:    
+   		     Machines = json.load(data_file)
+   		     
+       except:
+          pass
 
     mem_pr = float(CONFIG.get('overcommit','MEM_PRESERVE'))
     if mem_pr < 100:
@@ -287,7 +299,8 @@ def createListAvailableResources(public_url,token_id,option):
         used_mem = 0
         total_disk = 0
         used_disk = 0
-     
+        
+      
         # load detail from nova reply
         if 'host' in hostDetails:
             #print "::::>", hostDetails['host']
@@ -296,17 +309,29 @@ def createListAvailableResources(public_url,token_id,option):
                     total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
                     total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
                     total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
+                    
+                    for m in Machines:
+                       if m in novah:
+                          if "Cores" in Machines[m]:
+                             total_cpu = Machines[m]["Cores"]
+                          if "Memory" in Machines[m]:
+                             total_memory = Machines[m]["Memory"]
+                       break   
+                    
                 if majorkey['resource']['project'] == '(used_now)':
                     used_mem = majorkey['resource']['memory_mb']
                     used_cpu = majorkey['resource']['cpu']
                     used_disk = majorkey['resource']['disk_gb']
                 # calculate available resources
+                
+
                 nCores = total_cpu - used_cpu
                 # memory is calculated 10% less than actual value to avoid commiting it all
                 memory = int(total_mem - used_mem - mem_pr * total_mem)
                 disk = total_disk - used_disk
 
             
+                  
             res[option][novah] = {'Type':'Machine','Attributes':{'Cores':nCores,"Memory":memory}}
 
             if itype not in ["docker","LXC"]:
